@@ -3,7 +3,12 @@ kind: ConfigMap
 metadata:
   name: racing-config
   namespace: dorikin-garage
+  labels:
+    app: racing
+    team: ae86
 data:
-  DRIFT_MODE: "disabled"
   TRACK: "Akina"
-  TECHNIQUE: "heel-toe"
+  TECHNIQUE: "Gutter Run"
+  DRIFT_MODE: "disabled"
+  MAX_RPM: "8000"
+  TIRES: "Potenza RE-71RS"

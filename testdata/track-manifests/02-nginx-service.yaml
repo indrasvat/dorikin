@@ -5,11 +5,12 @@ metadata:
   namespace: dorikin-garage
   labels:
     app: nginx
+    team: ae86
 spec:
-  type: ClusterIP
   selector:
     app: nginx
   ports:
-    - port: 80
-      targetPort: 80
-      protocol: TCP
+  - port: 80
+    targetPort: 80
+    name: http
+  type: ClusterIP
