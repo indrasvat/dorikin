@@ -17,6 +17,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ready = true
 		m.help.Width = msg.Width
 		return m, nil
+
+	case RefreshMsg:
+		m.refreshing = false
+		if msg.Err == nil && msg.Result != nil {
+			m.updateFromResult(msg.Result)
+		}
+		// Continue auto-refresh cycle if enabled
+		if m.autoRefresh {
+			cmd := m.tickCmd()
+			return m, cmd
+		}
+		return m, nil
+
+	case TickMsg:
+		// Auto-refresh tick - trigger a scan if not already refreshing
+		if m.autoRefresh && !m.refreshing && m.scanFunc != nil {
+			m.refreshing = true
+			cmd := m.doRefresh()
+			return m, cmd
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -65,6 +86,22 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.ToggleOK):
 		m.showAll = !m.showAll
 		m.applyFilter()
+
+	case key.Matches(msg, m.keys.Refresh):
+		if !m.refreshing && m.scanFunc != nil {
+			m.refreshing = true
+			cmd := m.doRefresh()
+			return m, cmd
+		}
+
+	case key.Matches(msg, m.keys.AutoRefresh):
+		m.autoRefresh = !m.autoRefresh
+		if m.autoRefresh {
+			// Start the auto-refresh cycle
+			cmd := m.tickCmd()
+			return m, cmd
+		}
+		return m, nil
 
 	case key.Matches(msg, m.keys.Help):
 		m.viewMode = ViewHelp

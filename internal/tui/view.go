@@ -53,6 +53,12 @@ func (m Model) renderHeader() string {
 		styles.StatusIcon(api.StatusError), m.result.Summary.Errors,
 	)
 
+	// Auto-refresh indicator
+	var autoIndicator string
+	if m.autoRefresh {
+		autoIndicator = m.styles.InSync.Render(" ⟳ AUTO ")
+	}
+
 	// Status indicator
 	var status string
 	if m.result.Summary.HasIssues() {
@@ -61,7 +67,7 @@ func (m Model) renderHeader() string {
 		status = m.styles.InSync.Render("✓ ALL SYNCED")
 	}
 
-	gap := m.width - lipgloss.Width(title) - lipgloss.Width(summary) - lipgloss.Width(status) - 10
+	gap := m.width - lipgloss.Width(title) - lipgloss.Width(summary) - lipgloss.Width(autoIndicator) - lipgloss.Width(status) - 10
 	if gap < 0 {
 		gap = 0
 	}
@@ -73,6 +79,7 @@ func (m Model) renderHeader() string {
 			strings.Repeat(" ", gap/2),
 			summary,
 			strings.Repeat(" ", gap/2),
+			autoIndicator,
 			status,
 		),
 	)
@@ -101,7 +108,8 @@ func (m Model) renderFooter() string {
 			m.styles.HelpKey.Render("↵")+m.styles.HelpDesc.Render(" detail"),
 			m.styles.HelpKey.Render("f")+m.styles.HelpDesc.Render(" filter"),
 			m.styles.HelpKey.Render("o")+m.styles.HelpDesc.Render(" toggle ok"),
-			m.styles.HelpKey.Render("?")+m.styles.HelpDesc.Render(" help"),
+			m.styles.HelpKey.Render("r")+m.styles.HelpDesc.Render(" refresh"),
+			m.styles.HelpKey.Render("a")+m.styles.HelpDesc.Render(" auto"),
 			m.styles.HelpKey.Render("q")+m.styles.HelpDesc.Render(" quit"),
 		)
 	case ViewDetail:

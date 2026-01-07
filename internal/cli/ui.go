@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -35,10 +36,11 @@ Examples:
 }
 
 var (
-	uiManifests []string
-	uiNamespace string
-	uiRecursive bool
-	uiIgnore    []string
+	uiManifests       []string
+	uiNamespace       string
+	uiRecursive       bool
+	uiIgnore          []string
+	uiRefreshInterval int
 )
 
 func init() {
@@ -48,6 +50,7 @@ func init() {
 	uiCmd.Flags().StringVarP(&uiNamespace, "namespace", "n", "", "filter by namespace")
 	uiCmd.Flags().BoolVarP(&uiRecursive, "recursive", "R", true, "recursively scan directories")
 	uiCmd.Flags().StringSliceVar(&uiIgnore, "ignore", defaultIgnorePaths(), "field paths to ignore")
+	uiCmd.Flags().IntVar(&uiRefreshInterval, "refresh-interval", 5, "auto-refresh interval in seconds (press 'a' to toggle)")
 }
 
 func runUI(cmd *cobra.Command, args []string) error {
@@ -82,12 +85,18 @@ func runUI(cmd *cobra.Command, args []string) error {
 		Recursive:     uiRecursive,
 	}
 
-	// Run scan
-	result, err := detector.Scan(cmd.Context(), opts)
+	// Create scan function for refresh
+	scanFunc := func() (*api.ScanResult, error) {
+		return detector.Scan(cmd.Context(), opts)
+	}
+
+	// Run initial scan
+	result, err := scanFunc()
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
-	// Launch TUI
-	return tui.Run(result)
+	// Launch TUI with refresh capability and configurable interval
+	interval := time.Duration(uiRefreshInterval) * time.Second
+	return tui.RunWithInterval(result, scanFunc, interval)
 }

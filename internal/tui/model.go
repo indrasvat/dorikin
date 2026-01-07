@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -8,6 +10,9 @@ import (
 	"github.com/indrasvat/dorikin/internal/tui/styles"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
+
+// DefaultAutoRefreshInterval is the default interval for auto-refresh.
+const DefaultAutoRefreshInterval = 5 * time.Second
 
 // ViewMode represents the current view mode.
 type ViewMode int
@@ -25,6 +30,12 @@ type Model struct {
 	reports  []api.DriftReport
 	filtered []int // indices into reports
 
+	// Refresh callback
+	scanFunc        ScanFunc
+	refreshing      bool
+	autoRefresh     bool
+	refreshInterval time.Duration
+
 	// UI state
 	cursor   int
 	viewMode ViewMode
@@ -41,18 +52,28 @@ type Model struct {
 	styles *styles.App
 }
 
+// RefreshMsg is sent when a refresh completes.
+type RefreshMsg struct {
+	Result *api.ScanResult
+	Err    error
+}
+
+// TickMsg is sent on each auto-refresh interval.
+type TickMsg time.Time
+
 // keyMap defines keyboard shortcuts.
 type keyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	Enter    key.Binding
-	Escape   key.Binding
-	Tab      key.Binding
-	Help     key.Binding
-	Quit     key.Binding
-	Filter   key.Binding
-	Refresh  key.Binding
-	ToggleOK key.Binding
+	Up          key.Binding
+	Down        key.Binding
+	Enter       key.Binding
+	Escape      key.Binding
+	Tab         key.Binding
+	Help        key.Binding
+	Quit        key.Binding
+	Filter      key.Binding
+	Refresh     key.Binding
+	AutoRefresh key.Binding
+	ToggleOK    key.Binding
 }
 
 // ShortHelp returns keybindings to be shown in the mini help view.
@@ -64,7 +85,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter, k.Escape},
-		{k.Filter, k.ToggleOK, k.Refresh},
+		{k.Filter, k.ToggleOK, k.Refresh, k.AutoRefresh},
 		{k.Help, k.Quit},
 	}
 }
@@ -107,6 +128,10 @@ func defaultKeyMap() keyMap {
 			key.WithKeys("r"),
 			key.WithHelp("r", "refresh"),
 		),
+		AutoRefresh: key.NewBinding(
+			key.WithKeys("a"),
+			key.WithHelp("a", "auto-refresh"),
+		),
 		ToggleOK: key.NewBinding(
 			key.WithKeys("o"),
 			key.WithHelp("o", "toggle ok"),
@@ -115,15 +140,22 @@ func defaultKeyMap() keyMap {
 }
 
 // NewModel creates a new TUI model.
-func NewModel(result *api.ScanResult) Model {
+func NewModel(result *api.ScanResult, scanFunc ScanFunc) Model {
+	return NewModelWithInterval(result, scanFunc, DefaultAutoRefreshInterval)
+}
+
+// NewModelWithInterval creates a new TUI model with a custom refresh interval.
+func NewModelWithInterval(result *api.ScanResult, scanFunc ScanFunc, interval time.Duration) Model {
 	m := Model{
-		result:   result,
-		reports:  result.Reports,
-		viewMode: ViewList,
-		showAll:  false,
-		help:     help.New(),
-		keys:     defaultKeyMap(),
-		styles:   styles.New(),
+		result:          result,
+		reports:         result.Reports,
+		scanFunc:        scanFunc,
+		refreshInterval: interval,
+		viewMode:        ViewList,
+		showAll:         false,
+		help:            help.New(),
+		keys:            defaultKeyMap(),
+		styles:          styles.New(),
 	}
 
 	m.applyFilter()
@@ -188,5 +220,30 @@ func (m *Model) cycleFilter() {
 	}
 
 	m.filter = filters[(current+1)%len(filters)]
+	m.applyFilter()
+}
+
+// doRefresh performs an async refresh scan.
+func (m *Model) doRefresh() tea.Cmd {
+	if m.scanFunc == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		result, err := m.scanFunc()
+		return RefreshMsg{Result: result, Err: err}
+	}
+}
+
+// tickCmd returns a command that sends a TickMsg after the refresh interval.
+func (m *Model) tickCmd() tea.Cmd {
+	return tea.Tick(m.refreshInterval, func(t time.Time) tea.Msg {
+		return TickMsg(t)
+	})
+}
+
+// updateFromResult updates the model with new scan results.
+func (m *Model) updateFromResult(result *api.ScanResult) {
+	m.result = result
+	m.reports = result.Reports
 	m.applyFilter()
 }
