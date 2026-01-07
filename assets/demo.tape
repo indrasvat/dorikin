@@ -63,12 +63,15 @@ Type `PS1='tui> ' && clear`
 Enter
 Sleep 300ms
 
-Type "~/GolandProjects/indrasvat-dorikin/bin/dorikin ui --refresh-interval 1 ~/GolandProjects/indrasvat-dorikin/testdata/track-manifests 2>/dev/null"
+Type "./bin/dorikin ui --refresh-interval 1 ./testdata/track-manifests 2>/dev/null"
 Enter
-Sleep 4s
+Sleep 3s
 
-# Press 'o' in TUI to hide IN_SYNC resources (show only drift)
-Type "o"
+# Enable auto-refresh (toggle on with 'a')
+Type "a"
+Sleep 1s
+
+# Show initial state - all resources IN_SYNC
 Sleep 2s
 
 # Switch to LEFT pane
@@ -77,32 +80,34 @@ Left
 Sleep 500ms
 
 # LEFT PANE: Show what we're about to do
-Type "echo 'Injecting drift into the cluster...'"
+Type "echo 'Injecting drift...'"
 Enter
 Sleep 1s
 
 # Scale nginx replicas (drift!)
-Type "kubectl --context colima-dorikin-ae86 -n dorikin-garage scale deploy/nginx --replicas=5 2>/dev/null"
+Type "kubectl --context colima-dorikin-ae86 -n dorikin-garage scale deploy/nginx --replicas=5"
 Enter
-Sleep 3s
+Sleep 2s
 
 # Modify configmap (more drift!)
-Type `kubectl --context colima-dorikin-ae86 -n dorikin-garage patch cm racing-config --type merge -p '{"data":{"DRIFT_MODE":"TOKYO_DRIFT"}}' 2>/dev/null`
+Type `kubectl --context colima-dorikin-ae86 -n dorikin-garage patch cm racing-config --type merge -p '{"data":{"DRIFT_MODE":"TOKYO_DRIFT"}}'`
 Enter
-Sleep 4s
+Sleep 2s
 
 # Switch to RIGHT pane to see TUI caught the drift
 Ctrl+b
 Right
+Sleep 3s
+
+# Press 'o' to filter and show only drifted resources
+Type "o"
 Sleep 2s
 
-# Navigate down to see drifted resources
-Down
-Sleep 500ms
+# Navigate to first drifted resource
 Down
 Sleep 500ms
 
-# Press Enter to see details
+# Press Enter to see diff details
 Enter
 Sleep 3s
 
