@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: dorikin-garage
+  labels:
+    app: nginx
+    team: ae86
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25.0
+          ports:
+            - containerPort: 80
+          env:
+            - name: DRIVER
+              value: "Tsuchiya"
+            - name: CAR
+              value: "AE86"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
