@@ -4,7 +4,8 @@
 
 <p align="center">
   <strong>Kubernetes Configuration Drift Detector</strong><br>
-  <em>Catch your configs drifting before they Tokyo Drift into production chaos.</em>
+  <em>"You call that drifting?"</em><br>
+  <img src="https://img.shields.io/badge/ドリキン-Keiichi_Tsuchiya-C41E3A?style=flat&labelColor=1a1a1a" alt="Drift King">
 </p>
 
 <p align="center">
@@ -186,6 +187,8 @@ Potential future enhancements:
 - **Multi-cluster scanning** — Compare state across clusters
 - **Policy rules** — Define acceptable drift thresholds per resource type
 - **Git integration** — Compare cluster state against Git branches
+
+---
 
 ## License
 
