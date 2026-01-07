@@ -93,61 +93,57 @@ cluster:  replicas: 3.0    // JSON: float64
 
 Kubernetes adds many server-side fields that would cause false drift detection. Dorikin filters these by default.
 
+### Configuration File
+
+Dorikin looks for `.dorikin.yaml` in your project root (or any parent directory). This is the recommended way to configure ignore paths and other settings.
+
+```yaml
+# .dorikin.yaml
+ignore:
+  # Extend built-in defaults (default: true)
+  extend_defaults: true
+
+  # Additional global paths to ignore
+  paths:
+    - metadata.annotations.my-org.io/managed-by
+
+  # Resource-type-specific paths (for CRDs, etc.)
+  resources:
+    MyCustomResource:
+      - spec.internalState
+
+# HPA awareness mode
+hpa_aware: manifests  # manifests | cluster | disabled
+```
+
+See `.dorikin.yaml.example` in the repository for a complete reference.
+
 ### Default Ignored Fields
 
-**Metadata (always server-managed):**
-- `metadata.resourceVersion` - Changes on every update
-- `metadata.uid` - Unique identifier assigned by server
-- `metadata.generation` - Incremented on spec changes
-- `metadata.creationTimestamp` - Set at creation time
-- `metadata.managedFields` - Server-side apply tracking
-- `metadata.selfLink` - Deprecated self-reference
-- `metadata.annotations.kubectl.kubernetes.io/last-applied-configuration`
-- `metadata.annotations.deployment.kubernetes.io/revision`
+The built-in defaults are defined in [`internal/config/defaults.go`](../internal/config/defaults.go). Categories include:
 
-**Status (always server-side):**
-- `status` - Entire status subresource
+| Category | Examples |
+|----------|----------|
+| **Metadata** | `resourceVersion`, `uid`, `generation`, `creationTimestamp`, `managedFields` |
+| **Annotations** | `kubectl.kubernetes.io/last-applied-configuration`, `deployment.kubernetes.io/revision`, `autoscaling.alpha.kubernetes.io/*` |
+| **Status** | Entire `status` subresource |
+| **Deployment** | `progressDeadlineSeconds`, `revisionHistoryLimit`, `strategy` |
+| **Pod spec** | `dnsPolicy`, `restartPolicy`, `schedulerName`, `terminationGracePeriodSeconds` |
+| **Container** | `imagePullPolicy`, `terminationMessagePath`, probe thresholds |
+| **Service** | `clusterIP`, `clusterIPs`, `internalTrafficPolicy`, `ipFamilies` |
+| **StatefulSet** | `persistentVolumeClaimRetentionPolicy` |
 
-**Deployment defaults:**
-- `spec.progressDeadlineSeconds`
-- `spec.revisionHistoryLimit`
-- `spec.strategy`
-- `spec.template.metadata.creationTimestamp`
+### CLI Override
 
-**Pod spec defaults:**
-- `spec.template.spec.dnsPolicy`
-- `spec.template.spec.restartPolicy`
-- `spec.template.spec.schedulerName`
-- `spec.template.spec.terminationGracePeriodSeconds`
-- `spec.template.spec.securityContext`
-
-**Container defaults:**
-- `spec.template.spec.containers.imagePullPolicy`
-- `spec.template.spec.containers.terminationMessagePath`
-- `spec.template.spec.containers.terminationMessagePolicy`
-- `spec.template.spec.containers.ports.protocol`
-- Probe thresholds and schemes
-
-**Service defaults:**
-- `spec.clusterIP` / `spec.clusterIPs` - Assigned by server
-- `spec.internalTrafficPolicy`
-- `spec.ipFamilies` / `spec.ipFamilyPolicy`
-- `spec.sessionAffinity`
-- `spec.ports.protocol`
-
-### Custom Ignore Paths
-
-Add custom paths via the `--ignore` flag:
+The `--ignore` flag overrides the config file entirely:
 
 ```bash
-# Ignore replica count (useful with HPA)
-dorikin scan --ignore spec.replicas ./manifests/
-
-# Ignore multiple paths
+# Use only these paths (ignores config file)
 dorikin scan --ignore spec.replicas --ignore metadata.labels.version ./manifests/
 ```
 
-Ignore paths support:
+### Ignore Path Syntax
+
 - Exact matches: `spec.replicas`
 - Nested fields: `metadata.annotations.my-annotation`
 - Array wildcards: `spec.template.spec.containers.resources` (matches all containers)
@@ -199,16 +195,47 @@ kind: Service
 
 ### HPA and Deployment Replicas
 
-**Problem:** When an HPA manages a Deployment, it actively modifies `spec.replicas`. If your manifest says `replicas: 3` but HPA has scaled to 5, dorikin reports drift.
+**Solved:** Dorikin now supports **HPA-aware drift detection**. When an HPA manages a scalable resource (Deployment, StatefulSet, ReplicaSet), dorikin automatically skips `spec.replicas` comparison.
 
-**Why:** Dorikin compares manifests to cluster state exactly. It doesn't know that the HPA is *supposed* to change replicas.
+#### HPA Awareness Modes
 
-**Workaround:**
+| Mode | Flag | Behavior |
+|------|------|----------|
+| **Manifests** (default) | `--hpa-aware=manifests` | Extracts HPAs from manifest files |
+| **Cluster** | `--hpa-aware=cluster` | Also queries cluster for HPAs |
+| **Disabled** | `--hpa-aware=disabled` | Original behavior (compare replicas exactly) |
+
+#### How It Works
+
+1. Dorikin scans manifests for `HorizontalPodAutoscaler` resources
+2. Extracts `scaleTargetRef` to identify managed Deployments/StatefulSets
+3. When comparing those resources, `spec.replicas` is dynamically ignored
+
 ```bash
-dorikin scan --ignore spec.replicas ./manifests/
+# Default: HPA awareness from manifests
+dorikin scan ./manifests/
+
+# Also check cluster for HPAs not in manifests
+dorikin scan --hpa-aware=cluster ./manifests/
+
+# Disable HPA awareness (original behavior)
+dorikin scan --hpa-aware=disabled ./manifests/
 ```
 
-**Future:** HPA-aware mode that validates replicas within `minReplicas`/`maxReplicas` range.
+#### Supported Scalable Resources
+
+- Deployments
+- StatefulSets
+- ReplicaSets
+
+#### Edge Cases Handled
+
+| Scenario | Handling |
+|----------|----------|
+| HPA missing `minReplicas` | Defaults to 1 (Kubernetes default) |
+| `autoscaling/v1` HPAs | Fully supported |
+| `autoscaling/v2` HPAs | Fully supported |
+| Resource not managed by HPA | Normal replica comparison |
 
 ### No Range/Semantic Validation
 
@@ -281,7 +308,7 @@ Planned enhancements to address current limitations:
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| HPA-aware comparison | Skip `spec.replicas` when HPA targets the deployment | Planned |
+| HPA-aware comparison | Skip `spec.replicas` when HPA targets the deployment | **Implemented** |
 | Quantity normalization | Treat `128Mi` = `134217728` = `128M` | Planned |
 | Content-based array matching | Match array elements by key field (e.g., container name) | Planned |
 | Helm integration | `dorikin scan --helm ./chart` | Planned |

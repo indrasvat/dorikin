@@ -40,6 +40,7 @@ Dorikin compares your desired Kubernetes manifests against actual cluster state,
 - **Interactive TUI** — Navigate resources, view detailed diffs, filter by status
 - **Auto-refresh** — Continuously monitor for drift with configurable intervals
 - **Smart field filtering** — Ignores Kubernetes-managed fields (status, metadata.uid, etc.)
+- **HPA-aware** — Automatically skips replica comparison for HPA-managed resources
 - **Multi-format output** — Table, JSON, YAML, or quiet mode for CI/CD
 - **Recursive scanning** — Process entire manifest directories
 - **Context-aware** — Works with any kubeconfig context
@@ -128,6 +129,7 @@ dorikin scan [flags] [paths...]
 | `--output` | `-o` | Output format: `table`, `json`, `yaml`, `quiet` |
 | `--recursive` | `-R` | Recursively scan directories (default: true) |
 | `--ignore` | | Field paths to ignore during comparison |
+| `--hpa-aware` | | HPA awareness: `manifests` (default), `cluster`, `disabled` |
 
 ### UI Command
 
@@ -142,6 +144,7 @@ dorikin ui [flags] [paths...]
 | `--recursive` | `-R` | Recursively scan directories (default: true) |
 | `--refresh-interval` | | Auto-refresh interval in seconds (default: 5) |
 | `--ignore` | | Field paths to ignore during comparison |
+| `--hpa-aware` | | HPA awareness: `manifests` (default), `cluster`, `disabled` |
 
 ## TUI Controls
 
