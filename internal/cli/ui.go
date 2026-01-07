@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/indrasvat/dorikin/internal/config"
 	"github.com/indrasvat/dorikin/internal/drift"
 	"github.com/indrasvat/dorikin/internal/k8s"
 	"github.com/indrasvat/dorikin/internal/tui"
@@ -41,6 +42,7 @@ var (
 	uiRecursive       bool
 	uiIgnore          []string
 	uiRefreshInterval int
+	uiHPAAware        string
 )
 
 func init() {
@@ -49,8 +51,9 @@ func init() {
 	uiCmd.Flags().StringArrayVarP(&uiManifests, "file", "f", nil, "manifest file or directory (can be repeated)")
 	uiCmd.Flags().StringVarP(&uiNamespace, "namespace", "n", "", "filter by namespace")
 	uiCmd.Flags().BoolVarP(&uiRecursive, "recursive", "R", true, "recursively scan directories")
-	uiCmd.Flags().StringSliceVar(&uiIgnore, "ignore", defaultIgnorePaths(), "field paths to ignore")
+	uiCmd.Flags().StringSliceVar(&uiIgnore, "ignore", nil, "field paths to ignore (overrides config file)")
 	uiCmd.Flags().IntVar(&uiRefreshInterval, "refresh-interval", 5, "auto-refresh interval in seconds (press 'a' to toggle)")
+	uiCmd.Flags().StringVar(&uiHPAAware, "hpa-aware", "", "HPA awareness mode: manifests (default), cluster, disabled")
 }
 
 func runUI(cmd *cobra.Command, args []string) error {
@@ -60,6 +63,24 @@ func runUI(cmd *cobra.Command, args []string) error {
 	paths = append(paths, args...)
 	if len(paths) == 0 {
 		return fmt.Errorf("at least one manifest path required (use -f or positional args)")
+	}
+
+	// Load configuration from .dorikin.yaml (if present)
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Determine effective ignore paths: CLI flag overrides config
+	ignorePaths := cfg.EffectiveIgnorePaths()
+	if cmd.Flags().Changed("ignore") {
+		ignorePaths = uiIgnore
+	}
+
+	// Determine effective HPA mode: CLI flag overrides config
+	hpaModeStr := cfg.EffectiveHPAAware()
+	if cmd.Flags().Changed("hpa-aware") {
+		hpaModeStr = uiHPAAware
 	}
 
 	// Get kubeconfig options
@@ -75,14 +96,21 @@ func runUI(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	// Create detector
-	detector := drift.NewDetector(client, uiIgnore)
+	// Create detector with config
+	detector := drift.NewDetectorWithConfig(client, cfg, ignorePaths)
+
+	// Parse HPA awareness mode
+	hpaMode, err := parseHPAAwareMode(hpaModeStr)
+	if err != nil {
+		return err
+	}
 
 	// Build scan options
 	opts := api.ScanOptions{
 		ManifestPaths: paths,
 		Namespace:     uiNamespace,
 		Recursive:     uiRecursive,
+		HPAAware:      hpaMode,
 	}
 
 	// Create scan function for refresh

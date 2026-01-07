@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/indrasvat/dorikin/internal/config"
 	"github.com/indrasvat/dorikin/internal/drift"
 	"github.com/indrasvat/dorikin/internal/k8s"
 	"github.com/indrasvat/dorikin/pkg/api"
@@ -40,6 +41,7 @@ var (
 	scanRecursive bool
 	scanOutput    string
 	scanIgnore    []string
+	scanHPAAware  string
 )
 
 func init() {
@@ -49,7 +51,8 @@ func init() {
 	scanCmd.Flags().StringVarP(&scanNamespace, "namespace", "n", "", "filter by namespace")
 	scanCmd.Flags().BoolVarP(&scanRecursive, "recursive", "R", true, "recursively scan directories")
 	scanCmd.Flags().StringVarP(&scanOutput, "output", "o", "table", "output format: table, json, yaml, quiet")
-	scanCmd.Flags().StringSliceVar(&scanIgnore, "ignore", defaultIgnorePaths(), "field paths to ignore")
+	scanCmd.Flags().StringSliceVar(&scanIgnore, "ignore", nil, "field paths to ignore (overrides config file)")
+	scanCmd.Flags().StringVar(&scanHPAAware, "hpa-aware", "", "HPA awareness mode: manifests (default), cluster, disabled")
 }
 
 func runScan(cmd *cobra.Command, args []string) error {
@@ -59,6 +62,24 @@ func runScan(cmd *cobra.Command, args []string) error {
 	paths = append(paths, args...)
 	if len(paths) == 0 {
 		return fmt.Errorf("at least one manifest path required (use -f or positional args)")
+	}
+
+	// Load configuration from .dorikin.yaml (if present)
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Determine effective ignore paths: CLI flag overrides config
+	ignorePaths := cfg.EffectiveIgnorePaths()
+	if cmd.Flags().Changed("ignore") {
+		ignorePaths = scanIgnore
+	}
+
+	// Determine effective HPA mode: CLI flag overrides config
+	hpaModeStr := cfg.EffectiveHPAAware()
+	if cmd.Flags().Changed("hpa-aware") {
+		hpaModeStr = scanHPAAware
 	}
 
 	// Get kubeconfig options
@@ -74,14 +95,21 @@ func runScan(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	// Create detector
-	detector := drift.NewDetector(client, scanIgnore)
+	// Create detector with config
+	detector := drift.NewDetectorWithConfig(client, cfg, ignorePaths)
+
+	// Parse HPA awareness mode
+	hpaMode, err := parseHPAAwareMode(hpaModeStr)
+	if err != nil {
+		return err
+	}
 
 	// Build scan options
 	opts := api.ScanOptions{
 		ManifestPaths: paths,
 		Namespace:     scanNamespace,
 		Recursive:     scanRecursive,
+		HPAAware:      hpaMode,
 	}
 
 	// Run scan
@@ -105,56 +133,16 @@ func runScan(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// defaultIgnorePaths returns the default paths to ignore during comparison.
-func defaultIgnorePaths() []string {
-	return []string{
-		// Metadata fields
-		"metadata.resourceVersion",
-		"metadata.uid",
-		"metadata.generation",
-		"metadata.creationTimestamp",
-		"metadata.managedFields",
-		"metadata.annotations.kubectl.kubernetes.io/last-applied-configuration",
-		"metadata.annotations.deployment.kubernetes.io/revision",
-		"metadata.selfLink",
-
-		// Status (always server-side)
-		"status",
-
-		// Deployment defaults
-		"spec.progressDeadlineSeconds",
-		"spec.revisionHistoryLimit",
-		"spec.strategy",
-		"spec.template.metadata.creationTimestamp",
-
-		// Pod spec defaults
-		"spec.template.spec.dnsPolicy",
-		"spec.template.spec.restartPolicy",
-		"spec.template.spec.schedulerName",
-		"spec.template.spec.terminationGracePeriodSeconds",
-		"spec.template.spec.securityContext",
-
-		// Container defaults
-		"spec.template.spec.containers.imagePullPolicy",
-		"spec.template.spec.containers.terminationMessagePath",
-		"spec.template.spec.containers.terminationMessagePolicy",
-		"spec.template.spec.containers.ports.protocol",
-		"spec.template.spec.containers.livenessProbe.failureThreshold",
-		"spec.template.spec.containers.livenessProbe.successThreshold",
-		"spec.template.spec.containers.livenessProbe.timeoutSeconds",
-		"spec.template.spec.containers.livenessProbe.httpGet.scheme",
-		"spec.template.spec.containers.readinessProbe.failureThreshold",
-		"spec.template.spec.containers.readinessProbe.successThreshold",
-		"spec.template.spec.containers.readinessProbe.timeoutSeconds",
-		"spec.template.spec.containers.readinessProbe.httpGet.scheme",
-
-		// Service defaults
-		"spec.clusterIP",
-		"spec.clusterIPs",
-		"spec.internalTrafficPolicy",
-		"spec.ipFamilies",
-		"spec.ipFamilyPolicy",
-		"spec.sessionAffinity",
-		"spec.ports.protocol",
+// parseHPAAwareMode parses the HPA awareness mode from string.
+func parseHPAAwareMode(mode string) (api.HPAAwareMode, error) {
+	switch mode {
+	case "manifests", "":
+		return api.HPAAwareModeManifests, nil
+	case "cluster":
+		return api.HPAAwareModeCluster, nil
+	case "disabled":
+		return api.HPAAwareModeDisabled, nil
+	default:
+		return "", fmt.Errorf("invalid --hpa-aware mode: %q (valid: manifests, cluster, disabled)", mode)
 	}
 }
