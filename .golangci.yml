@@ -11,7 +11,8 @@ formatters:
     - goimports
   settings:
     goimports:
-      local-prefixes: github.com/indrasvat/dorikin
+      local-prefixes:
+        - github.com/indrasvat/dorikin
 
 linters:
   enable:
@@ -87,13 +88,13 @@ linters:
       asserts: true
       comparison: true
 
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gosec
-        - errcheck
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
 
-    - path: cmd/
-      linters:
-        - wrapcheck
+      - path: cmd/
+        linters:
+          - wrapcheck
