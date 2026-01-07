@@ -47,8 +47,9 @@ Sleep 100ms
 Type "tmux set -t demo pane-border-status top"
 Enter
 Sleep 100ms
-# Use pane_index conditional: pane 0 = "test track", pane 1 = "dorikin tui"
-Type 'tmux set -t demo pane-border-format " #{?#{==:#{pane_index},0},test track,dorikin tui} "'
+# Use conditional format: pane 1 (left) = "test track", pane 2 (right) = "dorikin tui"
+# Note: pane-base-index is 1, so first pane is index 1, not 0
+Type 'tmux set -t demo pane-border-format " #{?#{==:#{pane_index},1},test track,dorikin tui} "'
 Enter
 Sleep 100ms
 
@@ -75,14 +76,6 @@ Type `tmux setw -t demo window-status-current-format ''`
 Enter
 Sleep 100ms
 
-# Set clean prompts in both panes BEFORE attaching
-Type `tmux send-keys -t demo:0.0 'PS1="$ " && clear' Enter`
-Enter
-Sleep 300ms
-Type `tmux send-keys -t demo:0.1 'PS1="$ " && clear' Enter`
-Enter
-Sleep 300ms
-
 # Clear outer shell
 Type "clear"
 Enter
@@ -90,21 +83,12 @@ Sleep 200ms
 
 Show
 
-# Attach to tmux session (titles already set)
+# Attach to tmux session (titles already set via send-keys)
 Type "tmux attach -t demo"
 Enter
 Sleep 1s
 
-# We're in RIGHT pane (pane 1) - switch to left first to show test track
-Ctrl+B
-Left
-Sleep 500ms
-
-# Switch back to RIGHT pane for TUI launch
-Ctrl+B
-Right
-Sleep 500ms
-
+# We start in RIGHT pane (pane 1) - launch TUI
 Type "./bin/dorikin ui --refresh-interval 1 ./testdata/track-manifests 2>/dev/null"
 Enter
 Sleep 3s

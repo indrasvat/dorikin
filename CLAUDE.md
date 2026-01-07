@@ -194,14 +194,40 @@ Type `PS1='$ ' && clear`
 Enter
 ```
 
-### Setting Pane Titles
+### Setting Pane Titles (WORKING SOLUTION)
 
-Pane titles need to be set from WITHIN the pane using escape sequences (bash resets terminal title on start):
+Use conditional format based on pane_index - this works from the start without needing to set titles from within panes:
 
 ```tape
-# Set terminal title using OSC 2 escape sequence (works with #{pane_title})
+# IMPORTANT: pane-base-index is typically 1, not 0!
+# Check with: tmux show-options -g pane-base-index
+# Pane 1 = first/left pane, Pane 2 = second/right pane
+
+Type 'tmux set -t demo pane-border-format " #{?#{==:#{pane_index},1},left title,right title} "'
+Enter
+```
+
+The conditional `#{?#{==:#{pane_index},1},true,false}` shows "true" for pane index 1, "false" otherwise.
+
+### Alternative: Setting Pane Titles from Within Panes
+
+If you need dynamic titles, set them from WITHIN each pane using OSC 2 escape sequences:
+
+```tape
+# Set terminal title (works with #{pane_title} format)
 Type `PS1='$ ' && printf '\033]2;my title\033\\' && clear`
 Enter
+```
+
+### Tmux pane-base-index Gotcha
+
+**CRITICAL**: Most tmux configs set `pane-base-index 1`, meaning panes are numbered 1, 2, 3... not 0, 1, 2...
+
+```bash
+# Check your pane-base-index
+tmux show-options -g pane-base-index
+
+# If it's 1, use #{pane_index},1 not #{pane_index},0 in conditionals
 ```
 
 ### What Doesn't Work
@@ -210,4 +236,5 @@ Enter
 - Escaped double quotes inside double quotes
 - `tmux send-keys` with commands containing both single and double quotes
 - `tmux select-pane -T` before attaching (bash resets the title)
+- Using `#{pane_index},0` when pane-base-index is 1 (always use correct index!)
 - Always prefer attaching to tmux and typing directly over `tmux send-keys`

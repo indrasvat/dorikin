@@ -1,7 +1,8 @@
 #!/bin/bash
 # Initialize demo pane with title and clean prompt
-# Usage: source demo-pane-init.sh "pane title"
-TITLE="${1:-demo}"
-echo -ne "\033]2;${TITLE}\033\\"
+# Usage: ./demo-pane-init.sh title_with_underscores
+# Underscores are converted to spaces in the title
+TITLE="${1//_/ }"
+printf '\033]2;%s\033\\' "$TITLE"
 PS1='$ '
 clear
