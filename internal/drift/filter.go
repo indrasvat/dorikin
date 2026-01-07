@@ -19,6 +19,21 @@ func NewFilter(ignorePaths []string) *Filter {
 	return &Filter{ignorePaths: paths}
 }
 
+// WithAdditionalPaths returns a new Filter that includes additional paths.
+// The original Filter is not modified.
+func (f *Filter) WithAdditionalPaths(additionalPaths []string) *Filter {
+	// Copy existing paths
+	paths := make(map[string]bool, len(f.ignorePaths)+len(additionalPaths))
+	for p := range f.ignorePaths {
+		paths[p] = true
+	}
+	// Add new paths
+	for _, p := range additionalPaths {
+		paths[normalizeJSONPath(p)] = true
+	}
+	return &Filter{ignorePaths: paths}
+}
+
 // ShouldIgnore returns true if the given path should be ignored.
 func (f *Filter) ShouldIgnore(path string) bool {
 	normalized := normalizeJSONPath(path)

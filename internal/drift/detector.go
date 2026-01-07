@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/indrasvat/dorikin/internal/config"
 	"github.com/indrasvat/dorikin/internal/k8s"
 	"github.com/indrasvat/dorikin/internal/loader"
 	"github.com/indrasvat/dorikin/pkg/api"
@@ -15,14 +16,27 @@ type Detector struct {
 	client     *k8s.Client
 	loader     loader.Loader
 	comparator *Comparator
+	config     *config.Config
 }
 
-// NewDetector creates a new Detector.
+// NewDetector creates a new Detector with the given ignore paths.
 func NewDetector(client *k8s.Client, ignorePaths []string) *Detector {
 	return &Detector{
 		client:     client,
 		loader:     loader.NewFileLoader(),
 		comparator: NewComparator(ignorePaths),
+		config:     nil, // No resource-specific config
+	}
+}
+
+// NewDetectorWithConfig creates a new Detector with configuration support.
+// The config enables resource-type-specific ignore paths.
+func NewDetectorWithConfig(client *k8s.Client, cfg *config.Config, ignorePaths []string) *Detector {
+	return &Detector{
+		client:     client,
+		loader:     loader.NewFileLoader(),
+		comparator: NewComparator(ignorePaths),
+		config:     cfg,
 	}
 }
 
@@ -41,8 +55,26 @@ func (d *Detector) Scan(ctx context.Context, opts api.ScanOptions) (*api.ScanRes
 		resources = filterByNamespace(resources, opts.Namespace)
 	}
 
+	// Build HPA target index for replica-aware comparison
+	var hpaIndex *HPATargetIndex
+	if opts.HPAAware != api.HPAAwareModeDisabled {
+		// Extract HPAs from manifests (always done unless disabled)
+		hpaIndex = ExtractHPATargetsFromManifests(resources)
+
+		// Optionally also query cluster for HPAs
+		if opts.HPAAware == api.HPAAwareModeCluster {
+			namespaces := extractNamespaces(resources)
+			clusterHPAs, err := d.client.ListHPAs(ctx, namespaces)
+			if err == nil {
+				clusterIndex := ExtractHPATargetsFromUnstructured(clusterHPAs)
+				hpaIndex.Merge(clusterIndex)
+			}
+			// On error, continue with manifest-only HPAs (graceful degradation)
+		}
+	}
+
 	// Detect drift for all resources
-	reports := d.detectDrift(ctx, resources)
+	reports := d.detectDrift(ctx, resources, hpaIndex)
 
 	// Calculate summary
 	summary := calculateSummary(reports)
@@ -58,7 +90,7 @@ func (d *Detector) Scan(ctx context.Context, opts api.ScanOptions) (*api.ScanRes
 }
 
 // detectDrift detects drift for a list of resources.
-func (d *Detector) detectDrift(ctx context.Context, resources []api.Resource) []api.DriftReport {
+func (d *Detector) detectDrift(ctx context.Context, resources []api.Resource, hpaIndex *HPATargetIndex) []api.DriftReport {
 	// Extract refs for batch fetching
 	refs := make([]api.ResourceRef, len(resources))
 	for i, res := range resources {
@@ -81,7 +113,7 @@ func (d *Detector) detectDrift(ctx context.Context, resources []api.Resource) []
 
 		// Go 1.25 Feature: WaitGroup.Go()
 		wg.Go(func() {
-			report := d.compareResource(resource, fetchResult)
+			report := d.compareResource(resource, fetchResult, hpaIndex)
 
 			mu.Lock()
 			reports[idx] = report
@@ -94,7 +126,7 @@ func (d *Detector) detectDrift(ctx context.Context, resources []api.Resource) []
 }
 
 // compareResource compares a single resource.
-func (d *Detector) compareResource(resource api.Resource, fetchResult k8s.FetchResult) api.DriftReport {
+func (d *Detector) compareResource(resource api.Resource, fetchResult k8s.FetchResult, hpaIndex *HPATargetIndex) api.DriftReport {
 	report := api.DriftReport{
 		Resource:   resource.Ref(),
 		CheckedAt:  time.Now(),
@@ -118,7 +150,25 @@ func (d *Detector) compareResource(resource api.Resource, fetchResult k8s.FetchR
 	expected := resource.Object.Object
 	actual := fetchResult.Object.Object
 
-	diffs := d.comparator.Compare(expected, actual)
+	// Build dynamic ignore paths
+	var dynamicIgnore []string
+	ref := resource.Ref()
+
+	// Add HPA-managed scalable resources' replica field
+	if IsScalableKind(ref.Kind) && hpaIndex != nil && hpaIndex.IsHPAManaged(ref) {
+		dynamicIgnore = append(dynamicIgnore, ".spec.replicas")
+	}
+
+	// Add resource-type-specific ignore paths from config
+	if d.config != nil && d.config.Ignore.Resources != nil {
+		if kindPaths, ok := d.config.Ignore.Resources[ref.Kind]; ok {
+			for _, p := range kindPaths {
+				dynamicIgnore = append(dynamicIgnore, "."+p)
+			}
+		}
+	}
+
+	diffs := d.comparator.CompareWithDynamicIgnore(expected, actual, dynamicIgnore)
 
 	if len(diffs) == 0 {
 		report.Status = api.StatusInSync
@@ -139,6 +189,20 @@ func filterByNamespace(resources []api.Resource, namespace string) []api.Resourc
 		}
 	}
 	return filtered
+}
+
+// extractNamespaces returns unique namespaces from resources.
+func extractNamespaces(resources []api.Resource) []string {
+	seen := make(map[string]bool)
+	var namespaces []string
+	for _, res := range resources {
+		ns := res.Object.GetNamespace()
+		if ns != "" && !seen[ns] {
+			seen[ns] = true
+			namespaces = append(namespaces, ns)
+		}
+	}
+	return namespaces
 }
 
 // calculateSummary calculates scan summary from reports.

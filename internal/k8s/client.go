@@ -168,3 +168,52 @@ func (c *Client) ServerVersion() (string, error) {
 func (c *Client) CurrentContext() string {
 	return c.context
 }
+
+// ListHPAs lists all HPAs in the specified namespaces.
+// If namespaces is empty, lists HPAs in all namespaces.
+func (c *Client) ListHPAs(ctx context.Context, namespaces []string) ([]*unstructured.Unstructured, error) {
+	// Try autoscaling/v2 first (preferred), fall back to v1
+	gvr := schema.GroupVersionResource{
+		Group:    "autoscaling",
+		Version:  "v2",
+		Resource: "horizontalpodautoscalers",
+	}
+
+	var allHPAs []*unstructured.Unstructured
+
+	// If no namespaces specified, list across all namespaces
+	if len(namespaces) == 0 {
+		result, err := c.dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			// Try v1 as fallback
+			gvr.Version = "v1"
+			result, err = c.dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("listing HPAs: %w", err)
+			}
+		}
+		for i := range result.Items {
+			allHPAs = append(allHPAs, &result.Items[i])
+		}
+		return allHPAs, nil
+	}
+
+	// List HPAs in each namespace
+	for _, ns := range namespaces {
+		result, err := c.dynamic.Resource(gvr).Namespace(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			// Try v1 as fallback for this namespace
+			gvr.Version = "v1"
+			result, err = c.dynamic.Resource(gvr).Namespace(ns).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				// Skip this namespace if HPA listing fails
+				continue
+			}
+		}
+		for i := range result.Items {
+			allHPAs = append(allHPAs, &result.Items[i])
+		}
+	}
+
+	return allHPAs, nil
+}

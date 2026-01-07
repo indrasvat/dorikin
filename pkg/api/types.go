@@ -175,6 +175,8 @@ type ScanOptions struct {
 	Recursive bool
 	// IncludeExtra includes resources in cluster but not in manifests.
 	IncludeExtra bool
+	// HPAAware controls HPA-aware replica comparison (default: manifests).
+	HPAAware HPAAwareMode
 }
 
 // DefaultIgnorePaths returns the default paths to ignore during comparison.
@@ -199,4 +201,16 @@ const (
 	OutputFormatJSON  OutputFormat = "json"
 	OutputFormatYAML  OutputFormat = "yaml"
 	OutputFormatQuiet OutputFormat = "quiet"
+)
+
+// HPAAwareMode controls how HPA awareness works during drift detection.
+type HPAAwareMode string
+
+const (
+	// HPAAwareModeManifests extracts HPAs from manifest files only (default).
+	HPAAwareModeManifests HPAAwareMode = "manifests"
+	// HPAAwareModeCluster also queries the cluster for HPAs.
+	HPAAwareModeCluster HPAAwareMode = "cluster"
+	// HPAAwareModeDisabled disables HPA awareness entirely.
+	HPAAwareModeDisabled HPAAwareMode = "disabled"
 )

@@ -25,9 +25,21 @@ func NewComparator(ignorePaths []string) *Comparator {
 // Compare compares expected and actual resource states.
 // Returns a list of field differences.
 func (c *Comparator) Compare(expected, actual map[string]any) []api.FieldDiff {
+	return c.CompareWithDynamicIgnore(expected, actual, nil)
+}
+
+// CompareWithDynamicIgnore compares resources with additional dynamic ignore paths.
+// This is used for HPA-managed resources where spec.replicas should be ignored.
+func (c *Comparator) CompareWithDynamicIgnore(expected, actual map[string]any, dynamicIgnore []string) []api.FieldDiff {
+	// Use the appropriate filter
+	filter := c.filter
+	if len(dynamicIgnore) > 0 {
+		filter = c.filter.WithAdditionalPaths(dynamicIgnore)
+	}
+
 	// Filter both maps
-	filteredExpected := c.filter.FilterMap(expected, "")
-	filteredActual := c.filter.FilterMap(actual, "")
+	filteredExpected := filter.FilterMap(expected, "")
+	filteredActual := filter.FilterMap(actual, "")
 
 	// Collect differences
 	var diffs []api.FieldDiff
