@@ -108,12 +108,53 @@ func runScan(cmd *cobra.Command, args []string) error {
 // defaultIgnorePaths returns the default paths to ignore during comparison.
 func defaultIgnorePaths() []string {
 	return []string{
+		// Metadata fields
 		"metadata.resourceVersion",
 		"metadata.uid",
 		"metadata.generation",
 		"metadata.creationTimestamp",
 		"metadata.managedFields",
 		"metadata.annotations.kubectl.kubernetes.io/last-applied-configuration",
+		"metadata.annotations.deployment.kubernetes.io/revision",
+		"metadata.selfLink",
+
+		// Status (always server-side)
 		"status",
+
+		// Deployment defaults
+		"spec.progressDeadlineSeconds",
+		"spec.revisionHistoryLimit",
+		"spec.strategy",
+		"spec.template.metadata.creationTimestamp",
+
+		// Pod spec defaults
+		"spec.template.spec.dnsPolicy",
+		"spec.template.spec.restartPolicy",
+		"spec.template.spec.schedulerName",
+		"spec.template.spec.terminationGracePeriodSeconds",
+		"spec.template.spec.securityContext",
+
+		// Container defaults
+		"spec.template.spec.containers.imagePullPolicy",
+		"spec.template.spec.containers.terminationMessagePath",
+		"spec.template.spec.containers.terminationMessagePolicy",
+		"spec.template.spec.containers.ports.protocol",
+		"spec.template.spec.containers.livenessProbe.failureThreshold",
+		"spec.template.spec.containers.livenessProbe.successThreshold",
+		"spec.template.spec.containers.livenessProbe.timeoutSeconds",
+		"spec.template.spec.containers.livenessProbe.httpGet.scheme",
+		"spec.template.spec.containers.readinessProbe.failureThreshold",
+		"spec.template.spec.containers.readinessProbe.successThreshold",
+		"spec.template.spec.containers.readinessProbe.timeoutSeconds",
+		"spec.template.spec.containers.readinessProbe.httpGet.scheme",
+
+		// Service defaults
+		"spec.clusterIP",
+		"spec.clusterIPs",
+		"spec.internalTrafficPolicy",
+		"spec.ipFamilies",
+		"spec.ipFamilyPolicy",
+		"spec.sessionAffinity",
+		"spec.ports.protocol",
 	}
 }
