@@ -22,21 +22,46 @@ func NewFilter(ignorePaths []string) *Filter {
 // ShouldIgnore returns true if the given path should be ignored.
 func (f *Filter) ShouldIgnore(path string) bool {
 	normalized := normalizeJSONPath(path)
+	// Also create a version without array indices for wildcard matching
+	withoutIndices := stripArrayIndices(normalized)
 
 	// Check exact match
-	if f.ignorePaths[normalized] {
+	if f.ignorePaths[normalized] || f.ignorePaths[withoutIndices] {
 		return true
 	}
 
 	// Check if any ignore path is a prefix (for nested fields)
 	for ignorePath := range f.ignorePaths {
 		if strings.HasPrefix(normalized, ignorePath+".") ||
-			strings.HasPrefix(normalized, ignorePath+"[") {
+			strings.HasPrefix(normalized, ignorePath+"[") ||
+			strings.HasPrefix(withoutIndices, ignorePath+".") ||
+			strings.HasPrefix(withoutIndices, ignorePath+"[") {
 			return true
 		}
 	}
 
 	return false
+}
+
+// stripArrayIndices removes array indices from a path.
+// e.g., ".spec.containers[0].ports[1].protocol" -> ".spec.containers.ports.protocol"
+func stripArrayIndices(path string) string {
+	var result strings.Builder
+	inBracket := false
+	for _, c := range path {
+		if c == '[' {
+			inBracket = true
+			continue
+		}
+		if c == ']' {
+			inBracket = false
+			continue
+		}
+		if !inBracket {
+			result.WriteRune(c)
+		}
+	}
+	return result.String()
 }
 
 // normalizeJSONPath normalizes a JSON path for comparison.

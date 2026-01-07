@@ -65,10 +65,14 @@ func (c *Comparator) compareValues(path string, expected, actual any, diffs *[]a
 		return
 	}
 
+	// Normalize numeric types for comparison
+	expected = normalizeNumeric(expected)
+	actual = normalizeNumeric(actual)
+
 	expectedType := reflect.TypeOf(expected)
 	actualType := reflect.TypeOf(actual)
 
-	// Type mismatch
+	// Type mismatch (after normalization)
 	if expectedType != actualType {
 		*diffs = append(*diffs, api.FieldDiff{
 			Path:     path,
@@ -96,6 +100,40 @@ func (c *Comparator) compareValues(path string, expected, actual any, diffs *[]a
 				Type:     api.DiffTypeModified,
 			})
 		}
+	}
+}
+
+// normalizeNumeric converts all numeric types to float64 for comparison.
+// JSON unmarshaling returns all numbers as float64, while YAML keeps integers as int.
+// Normalizing to float64 ensures consistent comparison.
+func normalizeNumeric(v any) any {
+	switch n := v.(type) {
+	case int:
+		return float64(n)
+	case int8:
+		return float64(n)
+	case int16:
+		return float64(n)
+	case int32:
+		return float64(n)
+	case int64:
+		return float64(n)
+	case uint:
+		return float64(n)
+	case uint8:
+		return float64(n)
+	case uint16:
+		return float64(n)
+	case uint32:
+		return float64(n)
+	case uint64:
+		return float64(n)
+	case float32:
+		return float64(n)
+	case float64:
+		return n
+	default:
+		return v
 	}
 }
 
