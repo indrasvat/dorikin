@@ -23,6 +23,10 @@
 
 Dorikin compares your desired Kubernetes manifests against actual cluster state, detecting configuration drift in real-time. It provides both a CLI for scripting and CI/CD integration, and an interactive TUI for exploration and debugging.
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Dorikin Demo - Live Drift Detection" width="800">
+</p>
+
 > **[How Drift Detection Works](docs/drift-detection.md)** — Deep dive into the comparison algorithm, field filtering, limitations, and best practices.
 
 **Drift Types Detected:**

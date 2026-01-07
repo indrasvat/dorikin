@@ -226,6 +226,15 @@ tools: ## Install development tools
 	go install github.com/goreleaser/goreleaser@latest
 	@echo "$(COLOR_GREEN)✓ Tools installed$(COLOR_RESET)"
 
+.PHONY: demo
+demo: build ## Generate demo GIF (requires vhs, ffmpeg)
+	@echo "$(COLOR_BLUE)▶ Generating demo GIF...$(COLOR_RESET)"
+	@echo "$(COLOR_YELLOW)  Resetting test track to baseline...$(COLOR_RESET)"
+	@$(TEST_TRACK_SCRIPT) reset >/dev/null 2>&1
+	@echo "$(COLOR_YELLOW)  Recording with VHS (this takes ~45s)...$(COLOR_RESET)"
+	vhs assets/demo.tape
+	@echo "$(COLOR_GREEN)✓ Demo saved to assets/demo.gif$(COLOR_RESET)"
+
 .PHONY: version
 version: ## Show version info
 	@echo "$(COLOR_MAGENTA)Version:    $(VERSION)$(COLOR_RESET)"
