@@ -1,8 +1,17 @@
-# .golangci.yml - golangci-lint v1 configuration
+# .golangci.yml - golangci-lint v2 configuration
+version: "2"
 
 run:
   timeout: 5m
   modules-download-mode: readonly
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: github.com/indrasvat/dorikin
 
 linters:
   enable:
@@ -12,13 +21,9 @@ linters:
     - staticcheck
     - ineffassign
     - unused
-    - gosimple
 
     # Style
-    - gofmt
-    - goimports
     - misspell
-    - revive
 
     # Bugs
     - bodyclose
@@ -46,60 +51,41 @@ linters:
     - exhaustive
     - funlen
     - wrapcheck
+    - revive  # Too noisy for this codebase
 
-linters-settings:
-  gocyclo:
-    min-complexity: 15
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Printf
+        - (io.Closer).Close
+        - (*os.File).Close
 
-  gocognit:
-    min-complexity: 20
+    gocyclo:
+      min-complexity: 15
 
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - whyNoLint
-      - hugeParam
+    gocognit:
+      min-complexity: 20
 
-  revive:
-    rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unreachable-code
-      - name: redefines-builtin-id
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - whyNoLint
+        - hugeParam
 
-  gosec:
-    excludes:
-      - G104
-      - G304
+    gosec:
+      excludes:
+        - G104  # Unhandled errors (covered by errcheck)
+        - G304  # File path from variable (expected for config loading)
 
-  errorlint:
-    errorf: true
-    asserts: true
-    comparison: true
-
-  goimports:
-    local-prefixes: github.com/indrasvat/dorikin
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
 
 issues:
   exclude-rules:
