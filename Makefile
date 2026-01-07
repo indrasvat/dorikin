@@ -30,6 +30,10 @@ GORELEASER := goreleaser
 # Test track script
 TEST_TRACK_SCRIPT := ./scripts/test-track.sh
 
+# Demo config
+MANIFEST_DIR := ./testdata/track-manifests
+TEST_NAMESPACE := dorikin-garage
+
 # Colors for output
 COLOR_RESET := \033[0m
 COLOR_BOLD := \033[1m
@@ -229,11 +233,19 @@ tools: ## Install development tools
 .PHONY: demo
 demo: build ## Generate demo GIF (requires vhs, ffmpeg)
 	@echo "$(COLOR_BLUE)▶ Generating demo GIF...$(COLOR_RESET)"
-	@echo "$(COLOR_YELLOW)  Resetting test track to baseline...$(COLOR_RESET)"
-	@$(TEST_TRACK_SCRIPT) reset >/dev/null 2>&1
 	@echo "$(COLOR_YELLOW)  Recording with VHS (this takes ~45s)...$(COLOR_RESET)"
 	vhs assets/demo.tape
 	@echo "$(COLOR_GREEN)✓ Demo saved to assets/demo.gif$(COLOR_RESET)"
+
+.PHONY: demo-tui
+demo-tui: ## Launch TUI with demo settings (fast refresh, silent build)
+	@$(MAKE) build >/dev/null 2>&1
+	@$(BIN_DIR)/$(BINARY_NAME) ui \
+		--refresh-interval 1 \
+		-f $(MANIFEST_DIR) \
+		-n $(TEST_NAMESPACE) \
+		--context $$($(TEST_TRACK_SCRIPT) context 2>/dev/null || echo "colima-dorikin-ae86") \
+		2>/dev/null
 
 .PHONY: version
 version: ## Show version info
