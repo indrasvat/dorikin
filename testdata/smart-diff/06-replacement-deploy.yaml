@@ -1,0 +1,156 @@
+# Test Scenario 6: Complete Template Replacement
+# Tests ModeReplacement for substantially different content (>75% changed)
+# This manifest will be modified in the cluster to be almost completely different
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: replacement-test
+  namespace: dorikin-garage
+  labels:
+    app: replacement-test
+    version: v1.0.0
+    architecture: monolith
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: replacement-test
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: replacement-test
+        version: v1.0.0
+        tier: backend
+      annotations:
+        config-hash: original-hash-12345
+    spec:
+      serviceAccountName: replacement-test
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: app
+        image: replacement-app:v1.0.0
+        imagePullPolicy: Always
+        command:
+        - /bin/app
+        - --config=/etc/app/config.yaml
+        - --log-level=info
+        args:
+        - serve
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: APP_ENV
+          value: staging
+        - name: DATABASE_URL
+          value: postgres://db:5432/myapp
+        - name: CACHE_URL
+          value: redis://redis:6379
+        - name: LOG_FORMAT
+          value: json
+        - name: ENABLE_METRICS
+          value: "true"
+        - name: MAX_CONNECTIONS
+          value: "100"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        volumeMounts:
+        - name: config
+          mountPath: /etc/app
+          readOnly: true
+        - name: data
+          mountPath: /var/lib/app
+      volumes:
+      - name: config
+        configMap:
+          name: replacement-test-config
+      - name: data
+        emptyDir: {}
+      nodeSelector:
+        node-type: general
+      tolerations:
+      - key: "workload"
+        operator: "Equal"
+        value: "general"
+        effect: "NoSchedule"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: replacement-test-config
+  namespace: dorikin-garage
+data:
+  config.yaml: |
+    server:
+      host: 0.0.0.0
+      port: 8080
+      read_timeout: 30s
+      write_timeout: 30s
+
+    database:
+      driver: postgres
+      host: db
+      port: 5432
+      name: myapp
+      pool_size: 10
+
+    cache:
+      driver: redis
+      host: redis
+      port: 6379
+      ttl: 300s
+
+    logging:
+      level: info
+      format: json
+      output: stdout
+
+    features:
+      enable_cache: true
+      enable_metrics: true
+      enable_tracing: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: replacement-test
+  namespace: dorikin-garage
+  labels:
+    app: replacement-test
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: replacement-test
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: replacement-test
+  namespace: dorikin-garage
