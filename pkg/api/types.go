@@ -91,6 +91,22 @@ const (
 	DiffTypeRemoved DiffType = "removed"
 )
 
+// RenderMode indicates how a diff should be rendered in the TUI.
+type RenderMode int
+
+const (
+	// RenderModeSideBySide renders simple values in side-by-side columns.
+	RenderModeSideBySide RenderMode = iota
+	// RenderModeUnifiedDiff renders multi-line text changes as unified diff.
+	RenderModeUnifiedDiff
+	// RenderModeStructuralAdd renders objects/arrays added in cluster.
+	RenderModeStructuralAdd
+	// RenderModeStructuralDel renders objects/arrays removed from cluster.
+	RenderModeStructuralDel
+	// RenderModeReplacement renders >75% different content with toggle view.
+	RenderModeReplacement
+)
+
 // DriftReport contains the drift analysis for a single resource.
 type DriftReport struct {
 	// Resource identifies the resource.
@@ -105,6 +121,15 @@ type DriftReport struct {
 	Error string `json:"error,omitempty" yaml:"error,omitempty"`
 	// SourceFile is the manifest file this resource came from.
 	SourceFile string `json:"sourceFile,omitempty" yaml:"sourceFile,omitempty"`
+
+	// ManifestObject is the full object from the manifest.
+	// Only populated for DRIFTED/MISSING resources to enable Manifest tab viewing.
+	// Excluded from JSON/YAML serialization to avoid bloat.
+	ManifestObject map[string]any `json:"-" yaml:"-"`
+	// ClusterObject is the full object from the cluster.
+	// Only populated for DRIFTED/EXTRA resources to enable Cluster tab viewing.
+	// Excluded from JSON/YAML serialization to avoid bloat.
+	ClusterObject map[string]any `json:"-" yaml:"-"`
 }
 
 // HasDrift returns true if the resource has drifted.
