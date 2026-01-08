@@ -82,9 +82,12 @@ func runUI(cmd *cobra.Command, args []string) error {
 	}
 	logcapture.Info("Initial scan complete: %d resources", len(result.Reports))
 
+	// Get current kubectl context for display
+	kubeContext := ctx.Detector.CurrentContext()
+
 	// Launch TUI with refresh capability and configurable interval
 	interval := time.Duration(uiRefreshInterval) * time.Second
-	return tui.RunWithCapture(result, scanFunc, interval, capture)
+	return tui.RunWithCapture(result, scanFunc, interval, capture, kubeContext)
 }
 
 // initLogCaptureForTUI creates log capture for TUI (always captures stderr).

@@ -285,3 +285,8 @@ func deepCopyValue(v any) any {
 		return v
 	}
 }
+
+// CurrentContext returns the current kubectl context name.
+func (d *Detector) CurrentContext() string {
+	return d.client.CurrentContext()
+}

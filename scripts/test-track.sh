@@ -585,7 +585,7 @@ drift_configmap_yaml() {
     # First, deploy if not present
     if ! kc get configmap app-config -n "${TEST_NAMESPACE}" &>/dev/null; then
         step "Deploying app-config ConfigMap..."
-        kc apply -f "${PROJECT_ROOT}/testdata/smart-diff/03-configmap-yaml.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
+        kc apply -f "${PROJECT_ROOT}/testdata/track-manifests/09-configmap-yaml.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
     fi
 
     # Patch with significant YAML changes
@@ -603,7 +603,7 @@ drift_sidecar_inject() {
     # First, deploy if not present
     if ! kc get deployment sidecar-test -n "${TEST_NAMESPACE}" &>/dev/null; then
         step "Deploying sidecar-test Deployment..."
-        kc apply -f "${PROJECT_ROOT}/testdata/smart-diff/04-sidecar-base.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
+        kc apply -f "${PROJECT_ROOT}/testdata/track-manifests/10-sidecar-base.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
     fi
 
     # Inject a simulated sidecar container

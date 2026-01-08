@@ -36,8 +36,8 @@ func RunWithInterval(result *api.ScanResult, scanFunc ScanFunc, interval time.Du
 }
 
 // RunWithCapture starts the TUI with log capture support.
-func RunWithCapture(result *api.ScanResult, scanFunc ScanFunc, interval time.Duration, capture *logcapture.Capture) error {
-	model := NewModelWithCapture(result, scanFunc, interval, capture)
+func RunWithCapture(result *api.ScanResult, scanFunc ScanFunc, interval time.Duration, capture *logcapture.Capture, kubeContext string) error {
+	model := NewModelWithCapture(result, scanFunc, interval, capture, kubeContext)
 
 	p := tea.NewProgram(
 		model,

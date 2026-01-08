@@ -38,9 +38,10 @@ const (
 // Model is the main TUI model.
 type Model struct {
 	// Data
-	result   *api.ScanResult
-	reports  []api.DriftReport
-	filtered []int // indices into reports
+	result      *api.ScanResult
+	reports     []api.DriftReport
+	filtered    []int // indices into reports
+	kubeContext string
 
 	// Refresh callback
 	scanFunc        ScanFunc
@@ -291,9 +292,10 @@ func (m *Model) updateFromResult(result *api.ScanResult) {
 }
 
 // NewModelWithCapture creates a new TUI model with log capture support.
-func NewModelWithCapture(result *api.ScanResult, scanFunc ScanFunc, interval time.Duration, capture *logcapture.Capture) Model {
+func NewModelWithCapture(result *api.ScanResult, scanFunc ScanFunc, interval time.Duration, capture *logcapture.Capture, kubeContext string) Model {
 	m := NewModelWithInterval(result, scanFunc, interval)
 	m.logCapture = capture
 	m.logsFilter = logcapture.LevelDebug // Show all levels by default
+	m.kubeContext = kubeContext
 	return m
 }

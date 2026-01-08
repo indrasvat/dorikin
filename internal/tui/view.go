@@ -47,6 +47,12 @@ func (m Model) View() string {
 func (m Model) renderHeader() string {
 	title := m.styles.Title.Render(" 🏎️  dorikin ")
 
+	// Cluster context indicator
+	var clusterInfo string
+	if m.kubeContext != "" {
+		clusterInfo = m.styles.ClusterContext.Render(" ☸ " + m.kubeContext + " ")
+	}
+
 	summary := fmt.Sprintf(
 		"%s %d  %s %d  %s %d  %s %d  %s %d",
 		styles.StatusIcon(api.StatusInSync), m.result.Summary.InSync,
@@ -70,7 +76,7 @@ func (m Model) renderHeader() string {
 		status = m.styles.InSync.Render("✓ ALL SYNCED")
 	}
 
-	gap := m.width - lipgloss.Width(title) - lipgloss.Width(summary) - lipgloss.Width(autoIndicator) - lipgloss.Width(status) - 10
+	gap := m.width - lipgloss.Width(title) - lipgloss.Width(clusterInfo) - lipgloss.Width(summary) - lipgloss.Width(autoIndicator) - lipgloss.Width(status) - 10
 	if gap < 0 {
 		gap = 0
 	}
@@ -79,6 +85,7 @@ func (m Model) renderHeader() string {
 		lipgloss.JoinHorizontal(
 			lipgloss.Center,
 			title,
+			clusterInfo,
 			strings.Repeat(" ", gap/2),
 			summary,
 			strings.Repeat(" ", gap/2),

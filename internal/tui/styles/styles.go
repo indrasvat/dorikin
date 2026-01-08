@@ -51,15 +51,16 @@ type App struct {
 	Content   lipgloss.Style
 
 	// Components
-	Title      lipgloss.Style
-	Subtitle   lipgloss.Style
-	StatusBar  lipgloss.Style
-	HelpKey    lipgloss.Style
-	HelpDesc   lipgloss.Style
-	HelpSep    lipgloss.Style
-	Tab        lipgloss.Style
-	TabActive  lipgloss.Style
-	TabContent lipgloss.Style
+	Title          lipgloss.Style
+	Subtitle       lipgloss.Style
+	StatusBar      lipgloss.Style
+	ClusterContext lipgloss.Style
+	HelpKey        lipgloss.Style
+	HelpDesc       lipgloss.Style
+	HelpSep        lipgloss.Style
+	Tab            lipgloss.Style
+	TabActive      lipgloss.Style
+	TabContent     lipgloss.Style
 
 	// Table
 	TableHeader     lipgloss.Style
@@ -131,6 +132,11 @@ func New() *App {
 		StatusBar: lipgloss.NewStyle().
 			Foreground(PandaWhite).
 			Background(MidnightGray).
+			Padding(0, 1),
+
+		ClusterContext: lipgloss.NewStyle().
+			Foreground(AkinaBlue).
+			Background(lipgloss.Color("#1A2A3A")).
 			Padding(0, 1),
 
 		HelpKey: lipgloss.NewStyle().

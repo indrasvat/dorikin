@@ -125,23 +125,37 @@ Ctrl+B
 Right
 Sleep 2s
 
-# Filter drifted only
-Type "o"
-Sleep 2s
-
-# Navigate to drifted resource
-Down
-Sleep 500ms
+# Default filter already hides OK resources - we see only drifted
+# Navigate to first drifted resource (Deployment/nginx)
+Sleep 1s
 
 # Show diff (enhanced detail pane with side-by-side view)
 Enter
 Sleep 2s
 
-# Demonstrate tab cycling (1-4 keys)
+# Demonstrate tab cycling (1-4 keys) - show YAML tabs
 Type "2"
+Sleep 2s
+
+# Scroll down in Manifest YAML tab
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
 Sleep 1s
+
 Type "3"
+Sleep 2s
+
+# Scroll down in Cluster YAML tab
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
 Sleep 1s
+
 Type "1"
 Sleep 1s
 
@@ -181,13 +195,15 @@ Ctrl+B
 Right
 Sleep 2s
 
-# Navigate to ConfigMap to show unified diff
+# Navigate down to find the new drifted resources
+Down
+Sleep 500ms
 Down
 Sleep 500ms
 Down
 Sleep 500ms
 
-# Enter detail view to see unified diff
+# Enter detail view for ConfigMap (app-config)
 Enter
 Sleep 2s
 
@@ -197,13 +213,29 @@ Sleep 1s
 Down
 Sleep 1s
 
-# Check Manifest tab to see full YAML with drift highlighting
+# Check Manifest tab to see full YAML
 Type "2"
 Sleep 2s
+
+# Scroll down in Manifest YAML
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 1s
 
 # Check Cluster tab
 Type "3"
 Sleep 2s
+
+# Scroll down in Cluster YAML
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 1s
 
 # Back to diffs tab
 Type "1"
@@ -213,7 +245,7 @@ Sleep 1s
 Escape
 Sleep 1s
 
-# Navigate to sidecar-test deployment to show structural add
+# Navigate to sidecar-test deployment
 Down
 Sleep 500ms
 
