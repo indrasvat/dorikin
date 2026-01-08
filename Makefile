@@ -252,7 +252,7 @@ deps: ## Download dependencies
 .PHONY: tools
 tools: ## Install development tools
 	@echo "$(COLOR_BLUE)▶ Installing tools...$(COLOR_RESET)"
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.7.2
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2
 	go install github.com/goreleaser/goreleaser@latest
 	go install gotest.tools/gotestsum@latest
 	@echo "$(COLOR_GREEN)✓ Tools installed$(COLOR_RESET)"
