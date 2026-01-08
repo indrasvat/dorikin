@@ -5,6 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/indrasvat/dorikin/internal/logcapture"
+	"github.com/indrasvat/dorikin/pkg/api"
 )
 
 // Update handles messages and updates the model.
@@ -157,18 +158,10 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.diffCursor = 0
 
 	case key.Matches(msg, m.keys.Up):
-		// Scroll up within diffs
-		if m.diffCursor > 0 {
-			m.diffCursor--
-			m.adjustDetailScroll()
-		}
+		m.handleDetailUp(report)
 
 	case key.Matches(msg, m.keys.Down):
-		// Scroll down within diffs
-		if report != nil && m.diffCursor < len(report.Diffs)-1 {
-			m.diffCursor++
-			m.adjustDetailScroll()
-		}
+		m.handleDetailDown(report)
 
 	case key.Matches(msg, m.keys.Left):
 		// Navigate to previous resource (lap)
@@ -210,6 +203,36 @@ func (m *Model) handleDetailTabKeys(msg tea.KeyMsg) {
 		m.detailTab = TabCluster
 	case "4":
 		m.detailTab = TabMeta
+	}
+}
+
+// handleDetailUp handles up navigation in detail view.
+func (m *Model) handleDetailUp(report *api.DriftReport) {
+	// For Manifest/Cluster tabs, scroll the YAML view
+	if m.detailTab == TabManifest || m.detailTab == TabCluster {
+		if m.detailScroll > 0 {
+			m.detailScroll--
+		}
+		return
+	}
+	// Scroll up within diffs
+	if m.diffCursor > 0 {
+		m.diffCursor--
+		m.adjustDetailScroll()
+	}
+}
+
+// handleDetailDown handles down navigation in detail view.
+func (m *Model) handleDetailDown(report *api.DriftReport) {
+	// For Manifest/Cluster tabs, scroll the YAML view
+	if m.detailTab == TabManifest || m.detailTab == TabCluster {
+		m.detailScroll++
+		return
+	}
+	// Scroll down within diffs
+	if report != nil && m.diffCursor < len(report.Diffs)-1 {
+		m.diffCursor++
+		m.adjustDetailScroll()
 	}
 }
 
