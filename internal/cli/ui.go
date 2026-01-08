@@ -2,9 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/klog/v2"
 
 	"github.com/indrasvat/dorikin/internal/tui"
 	"github.com/indrasvat/dorikin/pkg/api"
@@ -46,6 +48,9 @@ func init() {
 }
 
 func runUI(cmd *cobra.Command, args []string) error {
+	// Suppress klog output to prevent logs bleeding into TUI
+	klog.SetOutput(io.Discard)
+
 	// Build scan context from common flags
 	ctx, err := BuildScanContext(cmd, args, &uiFlags)
 	if err != nil {
