@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: racing-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: racing
+    team: ae86
+data:
+  TRACK: {{ .Values.racing.track | quote }}
+  TECHNIQUE: {{ .Values.racing.technique | quote }}
+  DRIFT_MODE: {{ .Values.racing.driftMode | quote }}
+  MAX_RPM: {{ .Values.racing.maxRpm | quote }}
+  TIRES: {{ .Values.racing.tires | quote }}
