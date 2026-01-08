@@ -120,7 +120,7 @@ func TestCompare_AddedKey(t *testing.T) {
 
 	actual := map[string]any{
 		"spec": map[string]any{
-			"replicas":       float64(3),
+			"replicas":        float64(3),
 			"minReadySeconds": float64(10),
 		},
 	}
@@ -144,7 +144,7 @@ func TestCompare_RemovedKey(t *testing.T) {
 
 	expected := map[string]any{
 		"spec": map[string]any{
-			"replicas":       float64(3),
+			"replicas":        float64(3),
 			"minReadySeconds": float64(10),
 		},
 	}
