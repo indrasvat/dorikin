@@ -308,11 +308,13 @@ Planned enhancements to address current limitations:
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| HPA-aware comparison | Skip `spec.replicas` when HPA targets the deployment | **Implemented** |
+| HPA-aware comparison | Skip `spec.replicas` when HPA targets the deployment | ✅ Implemented |
+| Comprehensive unit tests | 213 tests with 80%+ coverage on core packages | ✅ Implemented |
+| CI/CD pipeline | GitHub Actions with `make ci`, pre-push hooks | ✅ Implemented |
+| Helm integration | `dorikin scan --helm ./chart` | 🚧 In Progress |
+| Kustomize integration | `dorikin scan --kustomize ./overlay` | 🚧 In Progress |
 | Quantity normalization | Treat `128Mi` = `134217728` = `128M` | Planned |
 | Content-based array matching | Match array elements by key field (e.g., container name) | Planned |
-| Helm integration | `dorikin scan --helm ./chart` | Planned |
-| Kustomize integration | `dorikin scan --kustomize ./overlay` | Planned |
 | Controller ownership | Use `managedFields` to skip controller-owned fields | Planned |
 | EXTRA resource detection | Find resources in cluster not in manifests | Partial |
 | Drift remediation | `dorikin apply` to sync cluster to manifests | Roadmap |
