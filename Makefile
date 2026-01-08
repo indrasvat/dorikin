@@ -267,15 +267,35 @@ info: ## Show project info
 	@echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Git Hooks
+# Git Hooks (Lefthook)
 # ══════════════════════════════════════════════════════════════════════════════
 
+LEFTHOOK := $(shell command -v lefthook 2> /dev/null)
+
+.PHONY: lefthook-install
+lefthook-install: ## Install lefthook if not present
+ifndef LEFTHOOK
+	@echo "$(COLOR_BLUE)▶ Installing lefthook...$(COLOR_RESET)"
+	@go install github.com/evilmartians/lefthook@latest
+endif
+	@echo "$(COLOR_GREEN)✓ Lefthook is installed$(COLOR_RESET)"
+
 .PHONY: hooks
-hooks: ## Install git hooks
-	@echo "$(COLOR_BLUE)▶ Installing git hooks...$(COLOR_RESET)"
-	@echo '#!/bin/sh\nmake ci-fast' > .git/hooks/pre-commit
-	@chmod +x .git/hooks/pre-commit
-	@echo "$(COLOR_GREEN)✓ Git hooks installed$(COLOR_RESET)"
+hooks: lefthook-install ## Setup git hooks with lefthook
+	@echo "$(COLOR_BLUE)▶ Installing git hooks via lefthook...$(COLOR_RESET)"
+	@lefthook install
+	@echo "$(COLOR_GREEN)✓ Git hooks installed (pre-push runs 'make ci')$(COLOR_RESET)"
+
+.PHONY: hooks-uninstall
+hooks-uninstall: ## Remove lefthook git hooks
+	@echo "$(COLOR_BLUE)▶ Removing git hooks...$(COLOR_RESET)"
+	@lefthook uninstall
+	@echo "$(COLOR_GREEN)✓ Git hooks removed$(COLOR_RESET)"
+
+.PHONY: hooks-run
+hooks-run: ## Run pre-push hook manually
+	@echo "$(COLOR_BLUE)▶ Running pre-push hook...$(COLOR_RESET)"
+	@lefthook run pre-push
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Test Track (Local K8s Testing)
