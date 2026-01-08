@@ -30,6 +30,11 @@ func DefaultIgnorePaths() []string {
 		"metadata.annotations.autoscaling.alpha.kubernetes.io/conditions",
 		"metadata.annotations.autoscaling.alpha.kubernetes.io/current-metrics",
 
+		// Helm release tracking (added by helm install/upgrade, not in helm template)
+		"metadata.annotations.meta.helm.sh/release-name",
+		"metadata.annotations.meta.helm.sh/release-namespace",
+		"metadata.labels.app.kubernetes.io/managed-by",
+
 		// ─────────────────────────────────────────────────────────────────
 		// Status (always server-side, never in manifests)
 		// ─────────────────────────────────────────────────────────────────
