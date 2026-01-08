@@ -5,9 +5,6 @@ on:
   push:
     tags:
       - "v*.*.*"
-    # TODO: Remove branch trigger after testing release on create-dorikin
-    branches:
-      - create-dorikin
 
 permissions:
   contents: write
