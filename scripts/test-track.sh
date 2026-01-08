@@ -574,11 +574,127 @@ drift_reorder_env() {
     echo -e "  ${JADE}✓${NC} Dorikin should detect ${JADE}NO drift${NC} (content-based array matching)"
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🎯 SMART DIFF SCENARIOS - Test different render modes
+# ═══════════════════════════════════════════════════════════════════════════════
+
+drift_argo_script() {
+    info "Drift: Modifying Argo Workflow inline Python script"
+
+    # First, deploy the Argo workflow if not present
+    if ! kc get workflow data-pipeline -n "${TEST_NAMESPACE}" &>/dev/null; then
+        step "Deploying Argo Workflow..."
+        kc apply -f "${PROJECT_ROOT}/testdata/smart-diff/02-argo-workflow.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || {
+            # If Argo CRD not installed, create a ConfigMap with the script instead
+            warn "Argo CRDs not installed, creating ConfigMap with script"
+            kc create configmap data-pipeline-script -n "${TEST_NAMESPACE}" \
+                --from-literal=script.py="$(cat << 'SCRIPT'
+#!/usr/bin/env python3
+"""Original data extraction module."""
+import os
+import json
+import logging
+from datetime import datetime
+from typing import Dict, List, Any
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class DataExtractor:
+    def __init__(self, source_path: str):
+        self.source_path = source_path
+        self.records = []
+
+    def extract(self):
+        logger.info(f"Extracting from {self.source_path}")
+        # Original extraction logic
+        return [{"id": i, "value": i*100} for i in range(100)]
+
+    def save_output(self, path: str):
+        os.makedirs(path, exist_ok=True)
+        with open(f"{path}/data.json", "w") as f:
+            json.dump(self.records, f)
+
+def main():
+    extractor = DataExtractor("s3://input")
+    extractor.extract()
+    extractor.save_output("/tmp/output")
+
+if __name__ == '__main__':
+    main()
+SCRIPT
+)" --dry-run=client -o yaml | kc apply -f -
+        }
+    fi
+
+    # Now modify the script with significant changes
+    kc patch configmap data-pipeline-script -n "${TEST_NAMESPACE}" --type merge \
+        -p '{"data":{"script.py":"#!/usr/bin/env python3\n\"\"\"MODIFIED: Enhanced data extraction module v2.0\"\"\"\nimport os\nimport json\nimport logging\nimport hashlib\nfrom datetime import datetime\nfrom typing import Dict, List, Any, Optional\nfrom dataclasses import dataclass\nimport asyncio\n\nlogging.basicConfig(level=logging.DEBUG, format=\"%(asctime)s - %(levelname)s - %(msg)s\")\nlogger = logging.getLogger(__name__)\n\n@dataclass\nclass DataRecord:\n    id: str\n    checksum: str\n    payload: Dict[str, Any]\n\nclass AsyncDataExtractor:\n    \"\"\"Async data extractor with batching support.\"\"\"\n    \n    def __init__(self, source: str, batch_size: int = 50):\n        self.source = source\n        self.batch_size = batch_size\n        self.records: List[DataRecord] = []\n\n    async def extract_batch(self, offset: int) -> List[DataRecord]:\n        logger.debug(f\"Extracting batch at offset {offset}\")\n        await asyncio.sleep(0.1)  # Simulate IO\n        return [\n            DataRecord(\n                id=f\"rec_{offset+i}\",\n                checksum=hashlib.md5(str(i).encode()).hexdigest(),\n                payload={\"value\": i * 100, \"batch\": offset // self.batch_size}\n            )\n            for i in range(self.batch_size)\n        ]\n\n    async def extract_all(self) -> List[DataRecord]:\n        tasks = [self.extract_batch(i) for i in range(0, 500, self.batch_size)]\n        batches = await asyncio.gather(*tasks)\n        self.records = [r for batch in batches for r in batch]\n        return self.records\n\n    def save(self, path: str) -> None:\n        os.makedirs(path, exist_ok=True)\n        with open(f\"{path}/enhanced_data.json\", \"w\") as f:\n            json.dump([{\"id\": r.id, \"checksum\": r.checksum, \"payload\": r.payload} for r in self.records], f, indent=2)\n\nasync def main():\n    extractor = AsyncDataExtractor(\"s3://data-lake/input\", batch_size=100)\n    await extractor.extract_all()\n    extractor.save(\"/tmp/output\")\n    logger.info(f\"Processed {len(extractor.records)} records\")\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"}}' 2>/dev/null || true
+
+    drift_alert
+    echo -e "  ${YELLOW}⚡${NC} Script substantially modified (async, batching, dataclasses)"
+    echo -e "  ${CYAN}→${NC} Tests ${CYAN}ModeUnifiedDiff${NC} rendering"
+}
+
+drift_configmap_yaml() {
+    info "Drift: Modifying embedded YAML in app-config ConfigMap"
+
+    # First, deploy if not present
+    if ! kc get configmap app-config -n "${TEST_NAMESPACE}" &>/dev/null; then
+        step "Deploying app-config ConfigMap..."
+        kc apply -f "${PROJECT_ROOT}/testdata/smart-diff/03-configmap-yaml.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
+    fi
+
+    # Patch with significant YAML changes
+    kc patch configmap app-config -n "${TEST_NAMESPACE}" --type merge \
+        -p '{"data":{"application.yml":"# Spring Boot Application Configuration\n# Environment: PRODUCTION - MODIFIED!\n\nspring:\n  application:\n    name: myapp-prod\n    version: 2.0.0\n\n  profiles:\n    active: production\n\n  datasource:\n    url: jdbc:postgresql://db-prod:5432/myapp_prod\n    username: ${DB_USER}\n    password: ${DB_PASSWORD}\n    hikari:\n      minimum-idle: 10\n      maximum-pool-size: 50\n      idle-timeout: 60000\n\n  redis:\n    host: redis-prod\n    port: 6379\n    cluster:\n      enabled: true\n      nodes:\n        - redis-prod-0:6379\n        - redis-prod-1:6379\n        - redis-prod-2:6379\n\n  kafka:\n    bootstrap-servers: kafka-prod-0:9092,kafka-prod-1:9092\n    consumer:\n      group-id: myapp-prod-consumer\n\nserver:\n  port: 8443\n  ssl:\n    enabled: true\n    key-store: /etc/ssl/keystore.p12\n\nmanagement:\n  endpoints:\n    web:\n      exposure:\n        include: health,info,metrics,prometheus\n\ncache:\n  type: redis\n  redis:\n    host: redis-prod\n    ttl: 3600\n\nlogging:\n  level:\n    root: WARN\n    com.myapp: INFO\n"}}' 2>/dev/null || true
+
+    drift_alert
+    echo -e "  ${YELLOW}⚡${NC} application.yml modified (staging → production config)"
+    echo -e "  ${CYAN}→${NC} Tests ${CYAN}ModeUnifiedDiff${NC} for embedded YAML"
+}
+
+drift_sidecar_inject() {
+    info "Drift: Simulating Istio sidecar injection (adding container)"
+
+    # First, deploy if not present
+    if ! kc get deployment sidecar-test -n "${TEST_NAMESPACE}" &>/dev/null; then
+        step "Deploying sidecar-test Deployment..."
+        kc apply -f "${PROJECT_ROOT}/testdata/smart-diff/04-sidecar-base.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
+    fi
+
+    # Inject a simulated sidecar container
+    kc patch deployment sidecar-test -n "${TEST_NAMESPACE}" --type json \
+        -p '[{"op":"add","path":"/spec/template/spec/containers/-","value":{"name":"istio-proxy","image":"docker.io/istio/proxyv2:1.20.0","ports":[{"containerPort":15001,"name":"envoy","protocol":"TCP"},{"containerPort":15006,"name":"envoy-mtls","protocol":"TCP"},{"containerPort":15090,"name":"http-envoy-prom","protocol":"TCP"}],"args":["proxy","sidecar","--domain","$(POD_NAMESPACE).svc.cluster.local","--proxyLogLevel","warning","--proxyComponentLogLevel","misc:error"],"env":[{"name":"POD_NAME","valueFrom":{"fieldRef":{"fieldPath":"metadata.name"}}},{"name":"POD_NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"ISTIO_META_MESH_ID","value":"cluster.local"}],"resources":{"requests":{"cpu":"10m","memory":"40Mi"},"limits":{"cpu":"2000m","memory":"1Gi"}},"securityContext":{"runAsUser":1337,"runAsGroup":1337}}}]' 2>/dev/null || true
+
+    drift_alert
+    echo -e "  ${PURPLE}➕${NC} Container ${CYAN}istio-proxy${NC} injected"
+    echo -e "  ${CYAN}→${NC} Tests ${CYAN}ModeStructuralAdd${NC} rendering"
+}
+
+drift_replace_template() {
+    info "Drift: Complete template replacement (substantially different)"
+
+    # First, deploy if not present
+    if ! kc get deployment replacement-test -n "${TEST_NAMESPACE}" &>/dev/null; then
+        step "Deploying replacement-test Deployment..."
+        kc apply -f "${PROJECT_ROOT}/testdata/smart-diff/06-replacement-deploy.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
+    fi
+
+    # Replace with completely different template
+    kc patch deployment replacement-test -n "${TEST_NAMESPACE}" --type strategic \
+        -p '{"spec":{"replicas":3,"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxSurge":"25%","maxUnavailable":"25%"}},"template":{"metadata":{"labels":{"version":"v3.0.0","architecture":"microservices"},"annotations":{"config-hash":"completely-new-hash"}},"spec":{"containers":[{"name":"app","image":"totally-different-image:v3.0.0","command":["/bin/new-entrypoint","--mode=production","--workers=4"],"ports":[{"containerPort":8443,"name":"https"},{"containerPort":9090,"name":"metrics"},{"containerPort":5000,"name":"grpc"}],"env":[{"name":"MODE","value":"production"},{"name":"WORKERS","value":"4"},{"name":"ENABLE_TLS","value":"true"},{"name":"LOG_FORMAT","value":"structured"}],"resources":{"requests":{"cpu":"500m","memory":"1Gi"},"limits":{"cpu":"2000m","memory":"4Gi"}},"volumeMounts":[{"name":"tls-certs","mountPath":"/etc/tls","readOnly":true}]}],"volumes":[{"name":"tls-certs","secret":{"secretName":"app-tls"}}]}}}}' 2>/dev/null || true
+
+    drift_alert
+    echo -e "  ${YELLOW}⚡${NC} Template substantially rewritten (>75% different)"
+    echo -e "  ${CYAN}→${NC} Tests ${CYAN}ModeReplacement${NC} rendering"
+}
+
 drift_all() {
     section "Applying ALL Drift Scenarios"
     warn "Maximum drift incoming!"
     echo ""
-    
+
     drift_replicas; sleep 1
     drift_image; sleep 1
     drift_configmap; sleep 1
@@ -586,8 +702,13 @@ drift_all() {
     drift_resources; sleep 1
     drift_service; sleep 1
     drift_extra; sleep 1
-    drift_missing
-    
+    drift_missing; sleep 1
+    # Smart diff scenarios
+    drift_argo_script; sleep 1
+    drift_configmap_yaml; sleep 1
+    drift_sidecar_inject; sleep 1
+    drift_replace_template
+
     section "Maximum Drift Achieved! 🚨"
     echo -e "${BG_YELLOW}${BLACK}  ⚡⚡⚡ TOKYO DRIFT MODE ACTIVATED ⚡⚡⚡  ${NC}"
     echo ""
@@ -616,11 +737,17 @@ drift_menu() {
     echo -e "  ${CYAN}Q${NC}) Quantity     ${GRAY}✓ Equivalent values (128Mi → bytes, should be NO drift)${NC}"
     echo -e "  ${CYAN}R${NC}) Reorder      ${GRAY}✓ Reorder env vars (should be NO drift)${NC}"
     echo ""
+    echo -e "  ${PURPLE}Smart Diff Scenarios:${NC}"
+    echo -e "  ${PURPLE}10${NC}) Argo Script   ${GRAY}Modify inline Python script (ModeUnifiedDiff)${NC}"
+    echo -e "  ${PURPLE}11${NC}) ConfigMap YAML ${GRAY}Modify embedded YAML (ModeUnifiedDiff)${NC}"
+    echo -e "  ${PURPLE}12${NC}) Sidecar       ${GRAY}Inject sidecar container (ModeStructuralAdd)${NC}"
+    echo -e "  ${PURPLE}13${NC}) Replace       ${GRAY}Complete template replacement (ModeReplacement)${NC}"
+    echo ""
     echo -e "  ${YELLOW}A${NC}) ALL          ${GRAY}⚡ Apply everything! ⚡${NC}"
     echo -e "  ${GRAY}0${NC}) Cancel"
     echo ""
 
-    read -rp "$(echo -e "${JADE}Select [1-8, Q, R, A, 0]: ${NC}")" choice
+    read -rp "$(echo -e "${JADE}Select [1-8, 10-13, Q, R, A, 0]: ${NC}")" choice
 
     case $choice in
         1) drift_replicas ;;
@@ -633,6 +760,10 @@ drift_menu() {
         8) drift_missing ;;
         [Qq]) drift_quantity_equiv ;;
         [Rr]) drift_reorder_env ;;
+        10) drift_argo_script ;;
+        11) drift_configmap_yaml ;;
+        12) drift_sidecar_inject ;;
+        13) drift_replace_template ;;
         [Aa]) drift_all ;;
         0) info "Cancelled" ;;
         *) error "Invalid choice" ;;
