@@ -46,6 +46,8 @@ Dorikin compares your desired Kubernetes manifests against actual cluster state,
 - **Auto-refresh** — Continuously monitor for drift with configurable intervals
 - **Smart field filtering** — Ignores Kubernetes-managed fields (status, metadata.uid, etc.)
 - **HPA-aware** — Automatically skips replica comparison for HPA-managed resources
+- **Quantity normalization** — Treats equivalent values as equal (`128Mi` = `134217728`, `500m` = `0.5`)
+- **Content-based matching** — Matches arrays by key field (containers by name, not index)
 - **Helm support** — Scan Helm charts directly with values and set overrides
 - **Kustomize support** — Scan Kustomize overlays directly
 - **Multi-format output** — Table, JSON, YAML, or quiet mode for CI/CD
