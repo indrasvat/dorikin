@@ -22,8 +22,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case RefreshMsg:
 		m.refreshing = false
-		if msg.Err == nil && msg.Result != nil {
+		if msg.Err != nil {
+			logcapture.Error("Refresh failed: %v", msg.Err)
+		} else if msg.Result != nil {
 			m.updateFromResult(msg.Result)
+			// Log summary of results
+			s := msg.Result.Summary
+			if s.HasIssues() {
+				logcapture.Warn("Scan complete: %d drifted, %d missing, %d extra, %d errors",
+					s.Drifted, s.Missing, s.Extra, s.Errors)
+			} else {
+				logcapture.Info("Scan complete: %d resources in sync", s.InSync)
+			}
 		}
 		// Continue auto-refresh cycle if enabled
 		if m.autoRefresh {
@@ -35,6 +45,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TickMsg:
 		// Auto-refresh tick - trigger a scan if not already refreshing
 		if m.autoRefresh && !m.refreshing && m.scanFunc != nil {
+			logcapture.Debug("Auto-refresh triggered")
 			m.refreshing = true
 			cmd := m.doRefresh()
 			return m, cmd
@@ -111,6 +122,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleRefresh handles manual refresh trigger.
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	if !m.refreshing && m.scanFunc != nil {
+		logcapture.Info("Manual refresh triggered")
 		m.refreshing = true
 		cmd := m.doRefresh()
 		return m, cmd
