@@ -89,7 +89,7 @@ Enter
 Sleep 1s
 
 # We start in RIGHT pane (pane 1) - launch TUI
-Type "./bin/dorikin ui --refresh-interval 1 ./testdata/track-manifests 2>/dev/null"
+Type "./bin/dorikin ui --refresh-interval 1 ./testdata/track-manifests"
 Enter
 Sleep 3s
 
@@ -133,13 +133,100 @@ Sleep 2s
 Down
 Sleep 500ms
 
-# Show diff
+# Show diff (enhanced detail pane with side-by-side view)
+Enter
+Sleep 2s
+
+# Demonstrate tab cycling (1-4 keys)
+Type "2"
+Sleep 1s
+Type "3"
+Sleep 1s
+Type "1"
+Sleep 1s
+
+# Scroll down to next diff
+Down
+Sleep 1s
+
+# Navigate to next resource (laps)
+Right
+Sleep 2s
+
+# Go back to list
+Escape
+Sleep 1s
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Demo: Smart Diff Rendering (Unified Diff, Structural Add)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Switch to left pane for more drift injection
+Ctrl+B
+Left
+Sleep 500ms
+
+# Inject ConfigMap embedded YAML drift (tests ModeUnifiedDiff)
+Type "make track-drift <<< '11'"
 Enter
 Sleep 3s
 
-# Go back
-Escape
+# Inject sidecar container (tests ModeStructuralAdd)
+Type "make track-drift <<< '12'"
+Enter
+Sleep 3s
+
+# Switch back to TUI
+Ctrl+B
+Right
 Sleep 2s
+
+# Navigate to ConfigMap to show unified diff
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+
+# Enter detail view to see unified diff
+Enter
+Sleep 2s
+
+# Show the unified diff with +/- lines
+Down
+Sleep 1s
+Down
+Sleep 1s
+
+# Check Manifest tab to see full YAML with drift highlighting
+Type "2"
+Sleep 2s
+
+# Check Cluster tab
+Type "3"
+Sleep 2s
+
+# Back to diffs tab
+Type "1"
+Sleep 1s
+
+# Go back to list
+Escape
+Sleep 1s
+
+# Navigate to sidecar-test deployment to show structural add
+Down
+Sleep 500ms
+
+Enter
+Sleep 2s
+
+# Show the structurally added container
+Down
+Sleep 1s
+
+# Go back to list
+Escape
+Sleep 1s
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Demo: Show logs view
