@@ -28,7 +28,7 @@ jobs:
           cache: true
 
       - name: Install tools
-        run: make tools
+        run: make tools-ci
 
       - name: Run CI
         run: make ci

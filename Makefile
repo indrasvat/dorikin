@@ -253,9 +253,15 @@ deps: ## Download dependencies
 tools: ## Install development tools
 	@echo "$(COLOR_BLUE)▶ Installing tools...$(COLOR_RESET)"
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2
-	go install github.com/goreleaser/goreleaser@latest
+	go install github.com/goreleaser/goreleaser/v2@latest
 	go install gotest.tools/gotestsum@latest
 	@echo "$(COLOR_GREEN)✓ Tools installed$(COLOR_RESET)"
+
+.PHONY: tools-ci
+tools-ci: ## Install CI tools (minimal)
+	@echo "$(COLOR_BLUE)▶ Installing CI tools...$(COLOR_RESET)"
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2
+	@echo "$(COLOR_GREEN)✓ CI tools installed$(COLOR_RESET)"
 
 .PHONY: demo
 demo: build ## Generate demo GIF (requires vhs, ffmpeg)
