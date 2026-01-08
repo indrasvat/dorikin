@@ -26,6 +26,7 @@ COVERAGE_DIR := coverage
 # Tools
 GOLANGCI_LINT := golangci-lint
 GORELEASER := goreleaser
+GOTESTSUM := $(shell command -v gotestsum 2> /dev/null)
 
 # Test track script
 TEST_TRACK_SCRIPT := ./scripts/test-track.sh
@@ -110,19 +111,31 @@ run-scan: build ## Run a scan (development)
 .PHONY: test
 test: ## Run tests
 	@echo "$(COLOR_BLUE)▶ Running tests...$(COLOR_RESET)"
+ifdef GOTESTSUM
+	gotestsum --format pkgname-and-test-fails -- -race -shuffle=on ./...
+else
 	go test -race -shuffle=on ./...
+endif
 	@echo "$(COLOR_GREEN)✓ Tests passed$(COLOR_RESET)"
 
 .PHONY: test-v
 test-v: ## Run tests with verbose output
 	@echo "$(COLOR_BLUE)▶ Running tests (verbose)...$(COLOR_RESET)"
+ifdef GOTESTSUM
+	gotestsum --format standard-verbose -- -race -shuffle=on ./...
+else
 	go test -race -shuffle=on -v ./...
+endif
 
 .PHONY: test-cover
 test-cover: ## Run tests with coverage
 	@echo "$(COLOR_BLUE)▶ Running tests with coverage...$(COLOR_RESET)"
 	@mkdir -p $(COVERAGE_DIR)
+ifdef GOTESTSUM
+	gotestsum --format pkgname-and-test-fails -- -race -shuffle=on -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic ./...
+else
 	go test -race -shuffle=on -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic ./...
+endif
 	go tool cover -html=$(COVERAGE_DIR)/coverage.out -o $(COVERAGE_DIR)/coverage.html
 	@echo "$(COLOR_GREEN)✓ Coverage report: $(COVERAGE_DIR)/coverage.html$(COLOR_RESET)"
 	@go tool cover -func=$(COVERAGE_DIR)/coverage.out | tail -1
@@ -130,7 +143,11 @@ test-cover: ## Run tests with coverage
 .PHONY: test-short
 test-short: ## Run short tests only
 	@echo "$(COLOR_BLUE)▶ Running short tests...$(COLOR_RESET)"
+ifdef GOTESTSUM
+	gotestsum --format pkgname-and-test-fails -- -race -shuffle=on -short ./...
+else
 	go test -race -shuffle=on -short ./...
+endif
 
 .PHONY: bench
 bench: ## Run benchmarks
@@ -228,6 +245,7 @@ tools: ## Install development tools
 	@echo "$(COLOR_BLUE)▶ Installing tools...$(COLOR_RESET)"
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install github.com/goreleaser/goreleaser@latest
+	go install gotest.tools/gotestsum@latest
 	@echo "$(COLOR_GREEN)✓ Tools installed$(COLOR_RESET)"
 
 .PHONY: demo
