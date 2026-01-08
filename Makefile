@@ -302,8 +302,7 @@ demo-tui: ## Launch TUI with demo settings (fast refresh, silent build)
 		--refresh-interval 1 \
 		-f $(MANIFEST_DIR) \
 		-n $(TEST_NAMESPACE) \
-		--context $$($(TEST_TRACK_SCRIPT) context 2>/dev/null || echo "colima-dorikin-ae86") \
-		2>/dev/null
+		--context $$($(TEST_TRACK_SCRIPT) context 2>/dev/null || echo "colima-dorikin-ae86")
 
 .PHONY: version
 version: ## Show version info

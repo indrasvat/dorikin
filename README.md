@@ -216,8 +216,7 @@ dorikin ui [flags] [paths...]
 |-----|--------|
 | `↑` / `k` | Navigate up |
 | `↓` / `j` | Navigate down |
-| `Enter` / `l` | View resource details |
-| `Esc` / `h` | Go back |
+| `Enter` | View resource details |
 | `f` | Cycle status filter |
 | `o` | Toggle IN_SYNC visibility |
 | `r` | Manual refresh |
@@ -225,6 +224,18 @@ dorikin ui [flags] [paths...]
 | `L` | Open logs view |
 | `?` | Show help |
 | `q` | Quit |
+
+### Detail View
+
+| Key | Action |
+|-----|--------|
+| `1`-`4` | Switch tabs (Diffs, Manifest, Cluster, Meta) |
+| `Tab` | Cycle through tabs |
+| `↑` / `k` | Scroll up through diffs |
+| `↓` / `j` | Scroll down through diffs |
+| `←` / `h` | Previous resource (lap) |
+| `→` / `l` | Next resource (lap) |
+| `Esc` | Return to list view |
 
 ### Logs View
 
