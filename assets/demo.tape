@@ -141,6 +141,32 @@ Sleep 3s
 Escape
 Sleep 2s
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Demo: Show logs view
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Open logs view
+Type "L"
+Sleep 2s
+
+# Scroll down through logs
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 1s
+
+# Cycle log filter (all → info+ → warn+)
+Type "f"
+Sleep 1s
+Type "f"
+Sleep 2s
+
+# Return to list view
+Escape
+Sleep 1s
+
 # Quit TUI
 Type "q"
 Sleep 500ms
