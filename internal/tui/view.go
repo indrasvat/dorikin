@@ -455,7 +455,7 @@ func (m Model) renderYAMLObject(obj map[string]any, path string, driftPaths map[
 			}
 		}
 
-		keyStyle := m.styles.Subtle
+		keyStyle := m.styles.YAMLText
 		if isDrifted {
 			if isManifest {
 				keyStyle = m.styles.DiffRemove
@@ -485,7 +485,7 @@ func (m Model) renderYAMLObject(obj map[string]any, path string, driftPaths map[
 					}
 				}
 
-				itemStyle := m.styles.Subtle
+				itemStyle := m.styles.YAMLText
 				if itemDrifted {
 					if isManifest {
 						itemStyle = m.styles.DiffRemove

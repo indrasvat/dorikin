@@ -28,8 +28,9 @@ var (
 	StatusError   = lipgloss.Color("#FF6B6B")
 
 	// Subtle colors
-	Subtle = lipgloss.Color("#626262")
-	Dim    = lipgloss.Color("#4A4A4A")
+	Subtle   = lipgloss.Color("#626262")
+	Dim      = lipgloss.Color("#4A4A4A")
+	YAMLText = lipgloss.Color("#A0A0A0") // Brighter color for YAML content
 
 	// Selection colors
 	SelectionGreen = lipgloss.Color("#2A3D2A") // Dark green tint for selected row background
@@ -82,7 +83,8 @@ type App struct {
 	DiffContext lipgloss.Style // Unchanged context lines
 
 	// Text styles
-	Subtle lipgloss.Style
+	Subtle   lipgloss.Style
+	YAMLText lipgloss.Style // Brighter style for YAML content
 
 	// Log level styles
 	LogDebug lipgloss.Style
@@ -222,6 +224,9 @@ func New() *App {
 		// Text styles
 		Subtle: lipgloss.NewStyle().
 			Foreground(Subtle),
+
+		YAMLText: lipgloss.NewStyle().
+			Foreground(YAMLText),
 
 		// Log level styles
 		LogDebug: lipgloss.NewStyle().
