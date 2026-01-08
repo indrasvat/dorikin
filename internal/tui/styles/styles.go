@@ -75,9 +75,11 @@ type App struct {
 	Error   lipgloss.Style
 
 	// Diff view
-	DiffAdd    lipgloss.Style
-	DiffRemove lipgloss.Style
-	DiffPath   lipgloss.Style
+	DiffAdd     lipgloss.Style
+	DiffRemove  lipgloss.Style
+	DiffPath    lipgloss.Style
+	DiffHunk    lipgloss.Style // @@ -1,3 +1,4 @@ hunk headers
+	DiffContext lipgloss.Style // Unchanged context lines
 
 	// Text styles
 	Subtle lipgloss.Style
@@ -209,6 +211,13 @@ func New() *App {
 		DiffPath: lipgloss.NewStyle().
 			Foreground(AkinaBlue).
 			Bold(true),
+
+		DiffHunk: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00BFFF")). // Cyan for @@ headers
+			Bold(true),
+
+		DiffContext: lipgloss.NewStyle().
+			Foreground(Subtle),
 
 		// Text styles
 		Subtle: lipgloss.NewStyle().
