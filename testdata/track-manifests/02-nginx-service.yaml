@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: dorikin-garage
+  labels:
+    app: nginx
+    team: ae86
+spec:
+  selector:
+    app: nginx
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  type: ClusterIP

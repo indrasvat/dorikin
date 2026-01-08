@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: racing-config
+  namespace: dorikin-garage
+  labels:
+    app: racing
+    team: ae86
+data:
+  TRACK: "Akina"
+  TECHNIQUE: "Gutter Run"
+  DRIFT_MODE: "disabled"
+  MAX_RPM: "8000"
+  TIRES: "Potenza RE-71RS"

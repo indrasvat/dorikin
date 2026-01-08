@@ -1,0 +1,33 @@
+# Dorikin Configuration
+# Place as .dorikin.yaml in your project root (or any parent directory)
+
+# Field paths to ignore during drift comparison
+ignore:
+  # When true (default), custom paths are added to built-in defaults
+  # When false, ONLY your custom paths are used (disables all defaults)
+  extend_defaults: true
+
+  # Additional global paths to ignore (all resource types)
+  paths:
+    # Example: Ignore a custom annotation on all resources
+    # - metadata.annotations.my-org.io/managed-by
+    # Example: Ignore a specific label
+    # - metadata.labels.git-commit
+
+  # Resource-type-specific paths to ignore
+  # Keys are Kubernetes Kind names (case-sensitive)
+  resources:
+    # Example: Ignore replicas for a specific Deployment (when not using HPA)
+    # Deployment:
+    #   - spec.replicas
+
+    # Example: Ignore custom fields on a CRD
+    # MyCustomResource:
+    #   - spec.internalState
+    #   - spec.controller.managed
+
+# HPA awareness mode for replica comparison
+# - "manifests" (default): Extract HPAs from manifest files
+# - "cluster": Also query cluster for HPAs not in manifests
+# - "disabled": Always compare spec.replicas (original behavior)
+hpa_aware: manifests

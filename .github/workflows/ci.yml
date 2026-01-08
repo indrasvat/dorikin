@@ -1,0 +1,90 @@
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.25"
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install tools
+        run: make tools-ci
+
+      - name: Run CI
+        run: make ci
+
+      - name: Run tests with coverage
+        run: go test -race -shuffle=on -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [ci]
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          LDFLAGS="-s -w"
+          LDFLAGS="${LDFLAGS} -X github.com/indrasvat/dorikin/internal/cli.Version=${VERSION}"
+          LDFLAGS="${LDFLAGS} -X github.com/indrasvat/dorikin/internal/cli.Commit=${COMMIT}"
+          LDFLAGS="${LDFLAGS} -X github.com/indrasvat/dorikin/internal/cli.BuildDate=${BUILD_DATE}"
+
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
+
+          go build -ldflags "${LDFLAGS}" -o dorikin-${GOOS}-${GOARCH}${EXT} ./cmd/dorikin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dorikin-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dorikin-*
+          retention-days: 7

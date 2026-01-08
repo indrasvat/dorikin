@@ -1,0 +1,33 @@
+# Default values for dorikin-test chart
+# Mirrors testdata/track-manifests for testing
+
+replicaCount: 3
+
+image:
+  repository: nginx
+  tag: "1.25.0"
+
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "100m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"
+
+env:
+  driver: "Tsuchiya"
+  car: "AE86"
+
+racing:
+  track: "Akina"
+  technique: "Gutter Run"
+  driftMode: "disabled"
+  maxRpm: "8000"
+  tires: "Potenza RE-71RS"
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilization: 70

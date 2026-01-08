@@ -1,0 +1,32 @@
+# IDE
+.idea/
+.vscode/
+
+# Build output
+bin/
+dist/
+dorikin
+
+# Test artifacts
+*.test
+*.out
+coverage.*
+
+# Debug
+__debug_bin*
+
+# Local/temp
+.local/
+*.log
+*.env
+*.tmp
+*~
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+

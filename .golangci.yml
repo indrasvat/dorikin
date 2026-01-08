@@ -1,0 +1,100 @@
+# .golangci.yml - golangci-lint v2 configuration
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/indrasvat/dorikin
+
+linters:
+  enable:
+    # Code quality
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+
+    # Style
+    - misspell
+
+    # Bugs
+    - bodyclose
+    - nilerr
+
+    # Performance
+    - prealloc
+
+    # Complexity
+    - gocyclo
+    - gocognit
+
+    # Security
+    - gosec
+
+    # Modern Go
+    - noctx
+    - gocritic
+
+    # Error handling
+    - errorlint
+
+  disable:
+    - depguard
+    - exhaustive
+    - funlen
+    - wrapcheck
+    - revive  # Too noisy for this codebase
+
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Printf
+        - (io.Closer).Close
+        - (*os.File).Close
+
+    gocyclo:
+      min-complexity: 15
+
+    gocognit:
+      min-complexity: 20
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - whyNoLint
+        - hugeParam
+
+    gosec:
+      excludes:
+        - G104  # Unhandled errors (covered by errcheck)
+        - G304  # File path from variable (expected for config loading)
+
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+
+      - path: cmd/
+        linters:
+          - wrapcheck

@@ -1,0 +1,76 @@
+# StatefulSet with HPA - tests HPA awareness for non-Deployment scalable resources
+# Expected: replicas should be ignored when HPA scales the StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+  namespace: dorikin-garage
+  labels:
+    app: cassandra
+    team: ae86
+spec:
+  serviceName: cassandra
+  replicas: 3
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      containers:
+      - name: cassandra
+        image: cassandra:4.1
+        ports:
+        - containerPort: 9042
+          name: cql
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+  namespace: dorikin-garage
+  labels:
+    app: cassandra
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: cassandra
+  ports:
+  - port: 9042
+    targetPort: 9042
+    name: cql
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cassandra-hpa
+  namespace: dorikin-garage
+  labels:
+    app: cassandra
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: cassandra
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75

@@ -1,0 +1,101 @@
+# HPA Edge Cases - tests various HPA configurations
+# Tests: missing minReplicas, autoscaling/v1 API version
+
+# Deployment with HPA that has no minReplicas (should default to 1)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-app
+  namespace: dorikin-garage
+  labels:
+    app: edge-app
+    team: ae86
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: edge-app
+  template:
+    metadata:
+      labels:
+        app: edge-app
+    spec:
+      containers:
+      - name: edge-app
+        image: nginx:1.25.0
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+---
+# HPA with explicit minReplicas (testing default handling)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: edge-app-hpa
+  namespace: dorikin-garage
+  labels:
+    app: edge-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: edge-app
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Deployment with autoscaling/v1 HPA
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: legacy-app
+  namespace: dorikin-garage
+  labels:
+    app: legacy-app
+    team: ae86
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: legacy-app
+  template:
+    metadata:
+      labels:
+        app: legacy-app
+    spec:
+      containers:
+      - name: legacy-app
+        image: nginx:1.24.0
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+---
+# autoscaling/v1 HPA - tests backward compatibility
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: legacy-app-hpa
+  namespace: dorikin-garage
+  labels:
+    app: legacy-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: legacy-app
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 75
