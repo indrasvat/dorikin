@@ -26,12 +26,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			logcapture.Error("Refresh failed: %v", msg.Err)
 		} else if msg.Result != nil {
 			m.updateFromResult(msg.Result)
-			// Log summary of results
+			// Log summary of results with appropriate level
 			s := msg.Result.Summary
-			if s.HasIssues() {
-				logcapture.Warn("Scan complete: %d drifted, %d missing, %d extra, %d errors",
+			switch {
+			case s.Errors > 0:
+				// Use ERROR for actual errors (connection failures, API errors)
+				logcapture.Error("Scan complete: %d drifted, %d missing, %d extra, %d errors",
 					s.Drifted, s.Missing, s.Extra, s.Errors)
-			} else {
+			case s.HasIssues():
+				// Use WARN for drift issues (missing, extra, drifted)
+				logcapture.Warn("Scan complete: %d drifted, %d missing, %d extra",
+					s.Drifted, s.Missing, s.Extra)
+			default:
 				logcapture.Info("Scan complete: %d resources in sync", s.InSync)
 			}
 		}
