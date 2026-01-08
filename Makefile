@@ -28,8 +28,10 @@ GOLANGCI_LINT := golangci-lint
 GORELEASER := goreleaser
 GOTESTSUM := $(shell command -v gotestsum 2> /dev/null)
 
-# Test track script
+# Test track scripts
 TEST_TRACK_SCRIPT := ./scripts/test-track.sh
+HELM_TRACK_SCRIPT := ./scripts/test-track-helm.sh
+KUSTOMIZE_TRACK_SCRIPT := ./scripts/test-track-kustomize.sh
 
 # Demo config
 MANIFEST_DIR := ./testdata/track-manifests
@@ -396,3 +398,67 @@ track-quick: build ## Quick test: setup → drift-all → scan
 	@$(TEST_TRACK_SCRIPT) setup
 	@echo "A" | $(TEST_TRACK_SCRIPT) drift
 	@$(TEST_TRACK_SCRIPT) scan || true
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Helm Test Track (dorikin-pitlane namespace)
+# ══════════════════════════════════════════════════════════════════════════════
+
+.PHONY: track-helm-deploy
+track-helm-deploy: build ## Deploy test Helm chart to cluster
+	@$(HELM_TRACK_SCRIPT) deploy
+
+.PHONY: track-helm-scan
+track-helm-scan: build ## Run dorikin scan with --helm flag
+	@$(HELM_TRACK_SCRIPT) scan
+
+.PHONY: track-helm-tui
+track-helm-tui: build ## Launch TUI with Helm loader
+	@$(HELM_TRACK_SCRIPT) tui
+
+.PHONY: track-helm-drift
+track-helm-drift: ## Apply drift scenarios to Helm-deployed resources (interactive)
+	@$(HELM_TRACK_SCRIPT) drift
+
+.PHONY: track-helm-reset
+track-helm-reset: ## Reset Helm test track to baseline
+	@$(HELM_TRACK_SCRIPT) reset
+
+.PHONY: track-helm-status
+track-helm-status: ## Show Helm test track status
+	@$(HELM_TRACK_SCRIPT) status
+
+.PHONY: track-helm-cleanup
+track-helm-cleanup: ## Destroy Helm test track completely
+	@$(HELM_TRACK_SCRIPT) cleanup
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Kustomize Test Track (dorikin-tuner namespace)
+# ══════════════════════════════════════════════════════════════════════════════
+
+.PHONY: track-kustomize-deploy
+track-kustomize-deploy: build ## Deploy test Kustomize overlay to cluster
+	@$(KUSTOMIZE_TRACK_SCRIPT) deploy
+
+.PHONY: track-kustomize-scan
+track-kustomize-scan: build ## Run dorikin scan with --kustomize flag
+	@$(KUSTOMIZE_TRACK_SCRIPT) scan
+
+.PHONY: track-kustomize-tui
+track-kustomize-tui: build ## Launch TUI with Kustomize loader
+	@$(KUSTOMIZE_TRACK_SCRIPT) tui
+
+.PHONY: track-kustomize-drift
+track-kustomize-drift: ## Apply drift scenarios to Kustomize-deployed resources (interactive)
+	@$(KUSTOMIZE_TRACK_SCRIPT) drift
+
+.PHONY: track-kustomize-reset
+track-kustomize-reset: ## Reset Kustomize test track to baseline
+	@$(KUSTOMIZE_TRACK_SCRIPT) reset
+
+.PHONY: track-kustomize-status
+track-kustomize-status: ## Show Kustomize test track status
+	@$(KUSTOMIZE_TRACK_SCRIPT) status
+
+.PHONY: track-kustomize-cleanup
+track-kustomize-cleanup: ## Destroy Kustomize test track completely
+	@$(KUSTOMIZE_TRACK_SCRIPT) cleanup
