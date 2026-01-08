@@ -1,0 +1,91 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+project_name: dorikin
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod verify
+
+builds:
+  - id: dorikin
+    main: ./cmd/dorikin
+    binary: dorikin
+    env:
+      - CGO_ENABLED=0
+    # TODO: Re-enable all platforms after alpha test
+    # goos: [linux, darwin, windows]
+    # goarch: [amd64, arm64]
+    # ignore:
+    #   - goos: windows
+    #     goarch: arm64
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/indrasvat/dorikin/internal/cli.Version={{.Version}}
+      - -X github.com/indrasvat/dorikin/internal/cli.Commit={{.ShortCommit}}
+      - -X github.com/indrasvat/dorikin/internal/cli.BuildDate={{.Date}}
+      - -X github.com/indrasvat/dorikin/internal/cli.GoVersion={{.Env.GO_VERSION}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Documentation
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - "^style:"
+      - "^chore\\(deps\\):"
+
+release:
+  github:
+    owner: indrasvat
+    name: dorikin
+  draft: false
+  prerelease: auto
+  name_template: "{{ .Tag }}"
+  header: |
+    ## Dorikin {{ .Tag }}
+
+    Kubernetes configuration drift detector.
+
+    ### Installation
+
+    Download the appropriate binary for your platform below, extract, and add to your PATH.
+
+    **macOS users:** After downloading, you may need to remove the quarantine attribute:
+    ```bash
+    xattr -d com.apple.quarantine dorikin
+    ```
+  footer: |
+    ---
+    **Full Changelog**: https://github.com/indrasvat/dorikin/compare/{{ .PreviousTag }}...{{ .Tag }}

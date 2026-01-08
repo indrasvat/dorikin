@@ -107,6 +107,28 @@ run-scan: build ## Run a scan (development)
 	@$(BIN_DIR)/$(BINARY_NAME) scan -f testdata/manifests/
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Release
+# ══════════════════════════════════════════════════════════════════════════════
+
+.PHONY: release-check
+release-check: ## Check GoReleaser configuration
+	@echo "$(COLOR_BLUE)▶ Checking GoReleaser config...$(COLOR_RESET)"
+	goreleaser check
+	@echo "$(COLOR_GREEN)✓ Config valid$(COLOR_RESET)"
+
+.PHONY: release-snapshot
+release-snapshot: ## Build snapshot release (no publish)
+	@echo "$(COLOR_BLUE)▶ Building snapshot release...$(COLOR_RESET)"
+	GO_VERSION=$(GO_VERSION) goreleaser release --snapshot --clean
+	@echo "$(COLOR_GREEN)✓ Snapshot built in dist/$(COLOR_RESET)"
+
+.PHONY: release-dry-run
+release-dry-run: ## Dry run release (no publish)
+	@echo "$(COLOR_BLUE)▶ Dry run release...$(COLOR_RESET)"
+	GO_VERSION=$(GO_VERSION) goreleaser release --skip=publish --clean
+	@echo "$(COLOR_GREEN)✓ Dry run complete$(COLOR_RESET)"
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Testing
 # ══════════════════════════════════════════════════════════════════════════════
 

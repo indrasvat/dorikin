@@ -56,6 +56,24 @@ Dorikin compares your desired Kubernetes manifests against actual cluster state,
 
 ## Installation
 
+### From Releases
+
+Download the latest binary for your platform from [Releases](https://github.com/indrasvat/dorikin/releases).
+
+```bash
+# Example for macOS ARM64
+curl -LO https://github.com/indrasvat/dorikin/releases/latest/download/dorikin_darwin_arm64.tar.gz
+tar -xzf dorikin_darwin_arm64.tar.gz
+chmod +x dorikin
+sudo mv dorikin /usr/local/bin/
+```
+
+**macOS users:** You may need to remove the quarantine attribute:
+
+```bash
+xattr -d com.apple.quarantine /usr/local/bin/dorikin
+```
+
 ### From Source
 
 ```bash
@@ -68,8 +86,8 @@ Binary will be available at `./bin/dorikin`.
 
 ### Requirements
 
-- Go 1.25+
 - Access to a Kubernetes cluster (via kubeconfig)
+- Go 1.25+ (if building from source)
 
 ## Usage
 
