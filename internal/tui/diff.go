@@ -28,14 +28,8 @@ func NewDiffRenderer(s *styles.App, width int) *DiffRenderer {
 // DetectRenderMode determines the optimal render mode for a diff.
 func DetectRenderMode(expected, actual any) api.RenderMode {
 	// Nil checks → structural add/del
-	if expected == nil && actual != nil {
-		return api.RenderModeStructuralAdd
-	}
-	if expected != nil && actual == nil {
-		return api.RenderModeStructuralDel
-	}
-	if expected == nil && actual == nil {
-		return api.RenderModeSideBySide // Both nil, no diff
+	if mode, handled := detectNilMode(expected, actual); handled {
+		return mode
 	}
 
 	// Type mismatch → replacement
@@ -44,36 +38,53 @@ func DetectRenderMode(expected, actual any) api.RenderMode {
 	}
 
 	// String comparison
-	expStr, expIsStr := expected.(string)
-	actStr, actIsStr := actual.(string)
-
-	if expIsStr && actIsStr {
-		expLines := strings.Count(expStr, "\n")
-		actLines := strings.Count(actStr, "\n")
-
-		// Multi-line or long strings → unified diff
-		if expLines > 2 || actLines > 2 || len(expStr) > 80 || len(actStr) > 80 {
-			// Check similarity - if too different, use replacement view
-			sim := stringSimilarity(expStr, actStr)
-			if sim < 0.25 {
-				return api.RenderModeReplacement
-			}
-			return api.RenderModeUnifiedDiff
-		}
-		return api.RenderModeSideBySide
+	if expStr, actStr, ok := extractStrings(expected, actual); ok {
+		return detectStringMode(expStr, actStr)
 	}
 
 	// Maps and slices - check structural similarity
 	if isComplexObject(expected) && isComplexObject(actual) {
-		sim := objectSimilarity(expected, actual)
-		if sim < 0.25 {
+		if objectSimilarity(expected, actual) < 0.25 {
 			return api.RenderModeReplacement
 		}
-		// If complex objects have meaningful differences, could use unified
-		// For now, use side-by-side for simple cases
-		return api.RenderModeSideBySide
 	}
 
+	return api.RenderModeSideBySide
+}
+
+// detectNilMode handles nil value scenarios.
+func detectNilMode(expected, actual any) (api.RenderMode, bool) {
+	if expected == nil && actual != nil {
+		return api.RenderModeStructuralAdd, true
+	}
+	if expected != nil && actual == nil {
+		return api.RenderModeStructuralDel, true
+	}
+	if expected == nil && actual == nil {
+		return api.RenderModeSideBySide, true
+	}
+	return api.RenderModeSideBySide, false
+}
+
+// extractStrings attempts to extract strings from both values.
+func extractStrings(expected, actual any) (expStr, actStr string, ok bool) {
+	expStr, expIsStr := expected.(string)
+	actStr, actIsStr := actual.(string)
+	return expStr, actStr, expIsStr && actIsStr
+}
+
+// detectStringMode determines render mode for string comparisons.
+func detectStringMode(expStr, actStr string) api.RenderMode {
+	expLines := strings.Count(expStr, "\n")
+	actLines := strings.Count(actStr, "\n")
+
+	// Multi-line or long strings → unified diff
+	if expLines > 2 || actLines > 2 || len(expStr) > 80 || len(actStr) > 80 {
+		if stringSimilarity(expStr, actStr) < 0.25 {
+			return api.RenderModeReplacement
+		}
+		return api.RenderModeUnifiedDiff
+	}
 	return api.RenderModeSideBySide
 }
 
@@ -158,7 +169,7 @@ func stringSimilarity(a, b string) float64 {
 	if a == b {
 		return 1.0
 	}
-	if len(a) == 0 || len(b) == 0 {
+	if a == "" || b == "" {
 		return 0.0
 	}
 

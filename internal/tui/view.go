@@ -361,31 +361,39 @@ func (m Model) renderClusterTab(report *api.DriftReport) string {
 }
 
 // renderMetaTab renders metadata information about the resource.
+//
+//nolint:gocognit // Complexity is inherent to rendering diverse metadata fields.
 func (m Model) renderMetaTab(report *api.DriftReport) string {
 	var lines []string
 
 	// Resource identification
-	lines = append(lines, m.styles.DiffPath.Render("  Resource"))
-	lines = append(lines, fmt.Sprintf("    Kind:       %s", report.Resource.Kind))
-	lines = append(lines, fmt.Sprintf("    Name:       %s", report.Resource.Name))
-	lines = append(lines, fmt.Sprintf("    Namespace:  %s", valueOrDefault(report.Resource.Namespace, "(cluster-scoped)")))
-	lines = append(lines, fmt.Sprintf("    APIVersion: %s", report.Resource.APIVersion))
-	lines = append(lines, "")
+	lines = append(lines,
+		m.styles.DiffPath.Render("  Resource"),
+		fmt.Sprintf("    Kind:       %s", report.Resource.Kind),
+		fmt.Sprintf("    Name:       %s", report.Resource.Name),
+		fmt.Sprintf("    Namespace:  %s", valueOrDefault(report.Resource.Namespace, "(cluster-scoped)")),
+		fmt.Sprintf("    APIVersion: %s", report.Resource.APIVersion),
+		"",
+	)
 
 	// Source file
 	if report.SourceFile != "" {
-		lines = append(lines, m.styles.DiffPath.Render("  Source"))
-		lines = append(lines, fmt.Sprintf("    File: %s", report.SourceFile))
-		lines = append(lines, "")
+		lines = append(lines,
+			m.styles.DiffPath.Render("  Source"),
+			fmt.Sprintf("    File: %s", report.SourceFile),
+			"",
+		)
 	}
 
 	// Status
-	lines = append(lines, m.styles.DiffPath.Render("  Status"))
 	statusStyle := m.styles.StatusStyle(report.Status)
-	lines = append(lines, fmt.Sprintf("    Status: %s %s",
-		styles.StatusIcon(report.Status),
-		statusStyle.Render(string(report.Status))))
-	lines = append(lines, fmt.Sprintf("    Checked: %s", report.CheckedAt.Format("2006-01-02 15:04:05")))
+	lines = append(lines,
+		m.styles.DiffPath.Render("  Status"),
+		fmt.Sprintf("    Status: %s %s",
+			styles.StatusIcon(report.Status),
+			statusStyle.Render(string(report.Status))),
+		fmt.Sprintf("    Checked: %s", report.CheckedAt.Format("2006-01-02 15:04:05")),
+	)
 	if len(report.Diffs) > 0 {
 		lines = append(lines, fmt.Sprintf("    Diffs:   %d field%s", len(report.Diffs), pluralize(len(report.Diffs))))
 	}
@@ -422,6 +430,8 @@ func (m Model) renderMetaTab(report *api.DriftReport) string {
 }
 
 // renderYAMLObject renders an object as YAML-like text with drift highlighting.
+//
+//nolint:gocognit,gocyclo // Complexity is inherent to recursive YAML rendering with type switching.
 func (m Model) renderYAMLObject(obj map[string]any, path string, driftPaths map[string]bool, isManifest bool) string {
 	var lines []string
 
@@ -513,7 +523,7 @@ func (m Model) renderYAMLObject(obj map[string]any, path string, driftPaths map[
 }
 
 // renderScrollableYAML wraps YAML content with scroll info.
-func (m Model) renderScrollableYAML(yaml string, title string) string {
+func (m Model) renderScrollableYAML(yaml, title string) string {
 	lines := strings.Split(yaml, "\n")
 
 	// Calculate visible range
@@ -532,9 +542,10 @@ func (m Model) renderScrollableYAML(yaml string, title string) string {
 		header += fmt.Sprintf("  [%d-%d]", startIdx+1, endIdx)
 	}
 
-	var result []string
-	result = append(result, m.styles.Subtle.Render(header))
-	result = append(result, "")
+	result := []string{
+		m.styles.Subtle.Render(header),
+		"",
+	}
 
 	// Visible lines with indentation
 	for i := startIdx; i < endIdx; i++ {
