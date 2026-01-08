@@ -19,25 +19,46 @@ type Detector struct {
 	config     *config.Config
 }
 
-// NewDetector creates a new Detector with the given ignore paths.
-func NewDetector(client *k8s.Client, ignorePaths []string) *Detector {
-	return &Detector{
-		client:     client,
-		loader:     loader.NewFileLoader(),
-		comparator: NewComparator(ignorePaths),
-		config:     nil, // No resource-specific config
+// DetectorOption is a functional option for configuring a Detector.
+type DetectorOption func(*Detector)
+
+// WithLoader sets a custom loader for the Detector.
+// By default, the FileLoader is used.
+func WithLoader(l loader.Loader) DetectorOption {
+	return func(d *Detector) {
+		d.loader = l
 	}
 }
 
-// NewDetectorWithConfig creates a new Detector with configuration support.
+// WithConfig sets the configuration for the Detector.
 // The config enables resource-type-specific ignore paths.
-func NewDetectorWithConfig(client *k8s.Client, cfg *config.Config, ignorePaths []string) *Detector {
-	return &Detector{
+func WithConfig(cfg *config.Config) DetectorOption {
+	return func(d *Detector) {
+		d.config = cfg
+	}
+}
+
+// NewDetector creates a new Detector with the given ignore paths and options.
+func NewDetector(client *k8s.Client, ignorePaths []string, opts ...DetectorOption) *Detector {
+	d := &Detector{
 		client:     client,
 		loader:     loader.NewFileLoader(),
 		comparator: NewComparator(ignorePaths),
-		config:     cfg,
+		config:     nil,
 	}
+
+	for _, opt := range opts {
+		opt(d)
+	}
+
+	return d
+}
+
+// NewDetectorWithConfig creates a new Detector with configuration support.
+//
+// Deprecated: Use NewDetector with WithConfig option instead.
+func NewDetectorWithConfig(client *k8s.Client, cfg *config.Config, ignorePaths []string) *Detector {
+	return NewDetector(client, ignorePaths, WithConfig(cfg))
 }
 
 // Scan performs a complete drift scan.
