@@ -148,27 +148,94 @@ func (m Model) handleAutoRefresh() (tea.Model, tea.Cmd) {
 
 // handleDetailKeys handles keys in detail view.
 func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	report := m.selectedReport()
+
 	switch {
 	case key.Matches(msg, m.keys.Escape):
 		m.viewMode = ViewList
+		m.detailScroll = 0
+		m.diffCursor = 0
 
 	case key.Matches(msg, m.keys.Up):
-		// Navigate to previous resource
-		if m.cursor > 0 {
-			m.cursor--
+		// Scroll up within diffs
+		if m.diffCursor > 0 {
+			m.diffCursor--
+			m.adjustDetailScroll()
 		}
 
 	case key.Matches(msg, m.keys.Down):
-		// Navigate to next resource
+		// Scroll down within diffs
+		if report != nil && m.diffCursor < len(report.Diffs)-1 {
+			m.diffCursor++
+			m.adjustDetailScroll()
+		}
+
+	case key.Matches(msg, m.keys.Left):
+		// Navigate to previous resource (lap)
+		if m.cursor > 0 {
+			m.cursor--
+			m.resetDetailState()
+		}
+
+	case key.Matches(msg, m.keys.Right):
+		// Navigate to next resource (lap)
 		if m.cursor < len(m.filtered)-1 {
 			m.cursor++
+			m.resetDetailState()
 		}
+
+	case key.Matches(msg, m.keys.Tab):
+		// Cycle through tabs
+		m.detailTab = (m.detailTab + 1) % 4
 
 	case key.Matches(msg, m.keys.Help):
 		m.viewMode = ViewHelp
+
+	default:
+		// Handle number keys for direct tab selection
+		m.handleDetailTabKeys(msg)
 	}
 
 	return m, nil
+}
+
+// handleDetailTabKeys handles number keys 1-4 for direct tab selection.
+func (m *Model) handleDetailTabKeys(msg tea.KeyMsg) {
+	switch msg.String() {
+	case "1":
+		m.detailTab = TabDiffs
+	case "2":
+		m.detailTab = TabManifest
+	case "3":
+		m.detailTab = TabCluster
+	case "4":
+		m.detailTab = TabMeta
+	}
+}
+
+// resetDetailState resets detail view state when switching resources.
+func (m *Model) resetDetailState() {
+	m.detailScroll = 0
+	m.diffCursor = 0
+	m.detailTab = TabDiffs
+}
+
+// adjustDetailScroll ensures the selected diff is visible.
+func (m *Model) adjustDetailScroll() {
+	// Calculate how many diffs fit on screen (rough estimate).
+	// Each diff box is about 6 lines (path + box with 3 lines + blank).
+	// The header, tabs, and footer use approximately 14 lines.
+	visibleDiffs := max(1, (m.height-14)/6)
+
+	// Scroll up if cursor is above viewport
+	if m.diffCursor < m.detailScroll {
+		m.detailScroll = m.diffCursor
+	}
+
+	// Scroll down if cursor is below viewport
+	if m.diffCursor >= m.detailScroll+visibleDiffs {
+		m.detailScroll = m.diffCursor - visibleDiffs + 1
+	}
 }
 
 // handleHelpKeys handles keys in help view.

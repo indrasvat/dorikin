@@ -25,6 +25,16 @@ const (
 	ViewLogs
 )
 
+// DetailTab represents the active tab in detail view.
+type DetailTab int
+
+const (
+	TabDiffs DetailTab = iota
+	TabManifest
+	TabCluster
+	TabMeta
+)
+
 // Model is the main TUI model.
 type Model struct {
 	// Data
@@ -47,6 +57,11 @@ type Model struct {
 	height   int
 	ready    bool
 	quitting bool
+
+	// Detail view state
+	detailTab    DetailTab // Current tab in detail view
+	detailScroll int       // Scroll position within detail content
+	diffCursor   int       // Selected diff index
 
 	// Log capture
 	logCapture *logcapture.Capture
@@ -72,6 +87,8 @@ type TickMsg time.Time
 type keyMap struct {
 	Up          key.Binding
 	Down        key.Binding
+	Left        key.Binding
+	Right       key.Binding
 	Enter       key.Binding
 	Escape      key.Binding
 	Tab         key.Binding
@@ -109,13 +126,21 @@ func defaultKeyMap() keyMap {
 			key.WithKeys("down", "j"),
 			key.WithHelp("↓/j", "down"),
 		),
+		Left: key.NewBinding(
+			key.WithKeys("left", "h"),
+			key.WithHelp("←/h", "prev"),
+		),
+		Right: key.NewBinding(
+			key.WithKeys("right", "l"),
+			key.WithHelp("→/l", "next"),
+		),
 		Enter: key.NewBinding(
-			key.WithKeys("enter", "l"),
-			key.WithHelp("↵/l", "details"),
+			key.WithKeys("enter"),
+			key.WithHelp("↵", "details"),
 		),
 		Escape: key.NewBinding(
-			key.WithKeys("esc", "h"),
-			key.WithHelp("esc/h", "back"),
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "back"),
 		),
 		Tab: key.NewBinding(
 			key.WithKeys("tab"),
