@@ -77,6 +77,14 @@ func (c *Comparator) compareValues(path string, expected, actual any, diffs *[]a
 		return
 	}
 
+	// Check for quantity fields (e.g., cpu: "500m" vs "0.5")
+	if isQuantityPath(path) {
+		if compareQuantities(expected, actual) {
+			return // Quantities are equivalent
+		}
+		// Fall through to normal comparison if not valid quantities
+	}
+
 	// Normalize numeric types for comparison
 	expected = normalizeNumeric(expected)
 	actual = normalizeNumeric(actual)
@@ -182,8 +190,17 @@ func (c *Comparator) compareMaps(basePath string, expected, actual map[string]an
 }
 
 // compareSlices compares two slices.
+// For named arrays (like containers, env, volumes), uses content-based matching by key.
+// For other arrays, uses index-based comparison.
 func (c *Comparator) compareSlices(basePath string, expected, actual []any, diffs *[]api.FieldDiff) {
-	// Simple length check first
+	// Check if this is a named array that should be matched by key
+	keyField := getArrayKeyField(basePath)
+	if keyField != "" && len(expected) > 0 && len(actual) > 0 {
+		c.compareNamedSlices(basePath, expected, actual, keyField, diffs)
+		return
+	}
+
+	// Fall back to index-based comparison for non-named arrays or empty arrays
 	if len(expected) != len(actual) {
 		*diffs = append(*diffs, api.FieldDiff{
 			Path:     basePath,
@@ -198,6 +215,41 @@ func (c *Comparator) compareSlices(basePath string, expected, actual []any, diff
 	for i := range expected {
 		path := fmt.Sprintf("%s[%d]", basePath, i)
 		c.compareValues(path, expected[i], actual[i], diffs)
+	}
+}
+
+// compareNamedSlices compares arrays using content-based matching.
+// Elements are matched by their key field (e.g., "name" for containers).
+func (c *Comparator) compareNamedSlices(basePath string, expected, actual []any, keyField string, diffs *[]api.FieldDiff) {
+	result := matchArraysByKey(expected, actual, keyField)
+
+	// Compare matched pairs
+	for _, pair := range result.matched {
+		// Use the key in the path for clarity (e.g., ".containers[nginx]" instead of ".containers[0]")
+		path := fmt.Sprintf("%s[%s]", basePath, pair.key)
+		c.compareValues(path, expected[pair.expectedIndex], actual[pair.actualIndex], diffs)
+	}
+
+	// Report removed elements (in expected but not in actual)
+	for _, idx := range result.removedIndices {
+		key, _ := extractKey(expected[idx], keyField)
+		path := fmt.Sprintf("%s[%s]", basePath, key)
+		*diffs = append(*diffs, api.FieldDiff{
+			Path:     path,
+			Expected: expected[idx],
+			Type:     api.DiffTypeRemoved,
+		})
+	}
+
+	// Report added elements (in actual but not in expected)
+	for _, idx := range result.addedIndices {
+		key, _ := extractKey(actual[idx], keyField)
+		path := fmt.Sprintf("%s[%s]", basePath, key)
+		*diffs = append(*diffs, api.FieldDiff{
+			Path:   path,
+			Actual: actual[idx],
+			Type:   api.DiffTypeAdded,
+		})
 	}
 }
 

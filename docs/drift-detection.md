@@ -62,8 +62,9 @@ Dorikin performs **field-level comparison** between your YAML manifests (desired
 The comparator walks both object trees recursively:
 
 - **Maps**: Compares all keys; reports added/removed/modified keys
-- **Slices**: Compares element-by-element by index (order matters)
+- **Slices**: Content-based matching for named arrays (containers, env, volumes, etc.); index-based for others
 - **Scalars**: Direct equality check after type normalization
+- **Quantities**: Semantic comparison for CPU/memory values (e.g., `500m` = `0.5`)
 
 ### Type Normalization
 
@@ -237,28 +238,47 @@ dorikin scan --hpa-aware=disabled ./manifests/
 | `autoscaling/v2` HPAs | Fully supported |
 | Resource not managed by HPA | Normal replica comparison |
 
-### No Range/Semantic Validation
+### Semantic Validation
 
-**Problem:** Dorikin performs exact comparison, not semantic validation.
+Dorikin now includes some semantic understanding:
 
-| Field | Current Behavior | Semantic Behavior (future) |
-|-------|------------------|---------------------------|
-| HPA `minReplicas: 3` | Exact match required | Could validate actual ∈ [min, max] |
-| Resource `memory: 128Mi` | String comparison | Could normalize units (128Mi = 134217728) |
-| Image `nginx:latest` | String comparison | Could resolve digest |
+| Field | Behavior |
+|-------|----------|
+| HPA-managed replicas | Automatically skipped (HPA-aware mode) |
+| Resource quantities | Normalized (`128Mi` = `134217728`, `500m` = `0.5`) |
+| Named arrays | Content-based matching by key field |
+| Image tags | String comparison (digest resolution not yet supported) |
 
-### Slice Ordering
+### Content-Based Array Matching
 
-**Problem:** Arrays are compared by index. If elements are reordered, dorikin sees multiple modifications.
+**Solved:** Dorikin now matches array elements by key field instead of by index for common Kubernetes arrays.
 
 ```yaml
-# Manifest                    # Cluster
+# These are now recognized as equivalent (no drift):
+# Manifest                    # Cluster (reordered)
 env:                          env:
-  - name: A                     - name: B    # Flagged as modified
-  - name: B                     - name: A    # Flagged as modified
+  - name: A                     - name: B    # Matched by name
+    value: "1"                    value: "2"
+  - name: B                     - name: A    # Matched by name
+    value: "2"                    value: "1"
 ```
 
-**Future:** Content-based matching for arrays with identifiable elements (e.g., match containers by `name`).
+Supported named arrays and their key fields:
+
+| Array Path | Key Field | Example |
+|------------|-----------|---------|
+| `.containers`, `.initContainers` | `name` | Match containers by name |
+| `.env` | `name` | Match env vars by name |
+| `.volumes` | `name` | Match volumes by name |
+| `.volumeMounts` | `name` | Match mounts by name |
+| `.containers[].ports` | `containerPort` | Match ports by number |
+| `.spec.ports` (Service) | `port` | Match service ports by number |
+| `.imagePullSecrets` | `name` | Match secrets by name |
+| `.tolerations` | `key` | Match tolerations by key |
+| `.matchExpressions` | `key` | Match selector expressions |
+| `.rules` (Ingress) | `host` | Match rules by host |
+
+Arrays not in this list (like `command` or `args`) still use index-based comparison.
 
 ### Controller-Managed Fields
 
@@ -328,17 +348,22 @@ dorikin ui --kustomize ./k8s/overlays/prod/
 
 Clear error messages are provided if the required binaries are not found.
 
-### Quantity String Comparison
+### Quantity Normalization
 
-**Problem:** Kubernetes quantities like `128Mi`, `0.5`, `500m` are compared as strings, not values.
+**Solved:** Dorikin now handles Kubernetes quantities intelligently using the `k8s.io/apimachinery/pkg/api/resource` package.
 
 ```yaml
-# These are semantically equal but will show as drift:
-memory: 128Mi    vs    memory: 134217728
-cpu: 500m        vs    cpu: 0.5
+# These are now recognized as equivalent (no drift):
+memory: 128Mi    vs    memory: 134217728  # bytes
+cpu: 500m        vs    cpu: 0.5           # cores
+memory: 1Gi      vs    memory: 1024Mi     # different units
 ```
 
-**Future:** Quantity normalization for resource values.
+Supported quantity paths include:
+- `resources.limits.cpu`, `resources.limits.memory`
+- `resources.requests.cpu`, `resources.requests.memory`
+- `resources.limits.ephemeral-storage`, `resources.requests.storage`
+- LimitRange and ResourceQuota fields
 
 ---
 
@@ -349,12 +374,12 @@ Planned enhancements to address current limitations:
 | Feature | Description | Status |
 |---------|-------------|--------|
 | HPA-aware comparison | Skip `spec.replicas` when HPA targets the deployment | ✅ Implemented |
-| Comprehensive unit tests | 241 tests with 80%+ coverage on core packages | ✅ Implemented |
+| Comprehensive unit tests | 344 tests with 80%+ coverage on core packages | ✅ Implemented |
 | CI/CD pipeline | GitHub Actions with `make ci`, pre-push hooks | ✅ Implemented |
 | Helm integration | `dorikin scan --helm ./chart` with values and set flags | ✅ Implemented |
 | Kustomize integration | `dorikin scan --kustomize ./overlay` | ✅ Implemented |
-| Quantity normalization | Treat `128Mi` = `134217728` = `128M` | Planned |
-| Content-based array matching | Match array elements by key field (e.g., container name) | Planned |
+| Quantity normalization | Treat `128Mi` = `134217728`, `500m` = `0.5` | ✅ Implemented |
+| Content-based array matching | Match array elements by key field (e.g., container name) | ✅ Implemented |
 | Controller ownership | Use `managedFields` to skip controller-owned fields | Planned |
 | EXTRA resource detection | Find resources in cluster not in manifests | Partial |
 | Drift remediation | `dorikin apply` to sync cluster to manifests | Roadmap |

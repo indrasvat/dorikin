@@ -229,15 +229,16 @@ func TestCompare_Slices_LengthMismatch(t *testing.T) {
 
 	diffs := c.Compare(expected, actual)
 
+	// With content-based matching, added containers are reported as individual additions
 	if len(diffs) != 1 {
 		t.Fatalf("Compare() returned %d diffs, want 1", len(diffs))
 	}
 
-	if diffs[0].Path != ".spec.containers" {
-		t.Errorf("diff path = %q, want %q", diffs[0].Path, ".spec.containers")
+	if diffs[0].Path != ".spec.containers[sidecar]" {
+		t.Errorf("diff path = %q, want %q", diffs[0].Path, ".spec.containers[sidecar]")
 	}
-	if diffs[0].Type != api.DiffTypeModified {
-		t.Errorf("diff type = %v, want %v", diffs[0].Type, api.DiffTypeModified)
+	if diffs[0].Type != api.DiffTypeAdded {
+		t.Errorf("diff type = %v, want %v", diffs[0].Type, api.DiffTypeAdded)
 	}
 }
 
@@ -272,8 +273,9 @@ func TestCompare_Slices_ElementDiff(t *testing.T) {
 		t.Fatalf("Compare() returned %d diffs, want 1", len(diffs))
 	}
 
-	if diffs[0].Path != ".spec.containers[0].image" {
-		t.Errorf("diff path = %q, want %q", diffs[0].Path, ".spec.containers[0].image")
+	// With content-based matching, path uses the key field value (name=nginx)
+	if diffs[0].Path != ".spec.containers[nginx].image" {
+		t.Errorf("diff path = %q, want %q", diffs[0].Path, ".spec.containers[nginx].image")
 	}
 }
 

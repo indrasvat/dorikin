@@ -553,6 +553,27 @@ drift_missing() {
     echo -e "  ${RED}🛑${NC} service/redis ${GRAY}(exists in manifests only)${NC}"
 }
 
+drift_quantity_equiv() {
+    info "Drift: Changing nginx resources to equivalent values (should be NO drift)"
+    # Change 128Mi to equivalent bytes (134217728), 200m to 0.2
+    kc patch deployment/nginx -n "${TEST_NAMESPACE}" --type json \
+        -p '[{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/memory","value":"134217728"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/cpu","value":"0.2"}]'
+    echo ""
+    echo -e "  ${JADE}ℹ${NC} limits.memory: ${JADE}128Mi${NC} → ${JADE}134217728 (equivalent bytes)${NC}"
+    echo -e "  ${JADE}ℹ${NC} limits.cpu: ${JADE}200m${NC} → ${JADE}0.2 (equivalent decimal)${NC}"
+    echo -e "  ${JADE}✓${NC} Dorikin should detect ${JADE}NO drift${NC} (quantity normalization)"
+}
+
+drift_reorder_env() {
+    info "Drift: Reordering nginx env vars (should be NO drift)"
+    # Get current env, reorder, and patch
+    kc patch deployment/nginx -n "${TEST_NAMESPACE}" --type json \
+        -p '[{"op":"replace","path":"/spec/template/spec/containers/0/env","value":[{"name":"CAR","value":"AE86"},{"name":"DRIVER","value":"Tsuchiya"}]}]'
+    echo ""
+    echo -e "  ${JADE}ℹ${NC} env order: ${JADE}[DRIVER, CAR]${NC} → ${JADE}[CAR, DRIVER]${NC}"
+    echo -e "  ${JADE}✓${NC} Dorikin should detect ${JADE}NO drift${NC} (content-based array matching)"
+}
+
 drift_all() {
     section "Applying ALL Drift Scenarios"
     warn "Maximum drift incoming!"
@@ -576,12 +597,12 @@ drift_all() {
 drift_menu() {
     banner
     section "Drift Scenario Menu"
-    
+
     if ! colima_running; then
         error "Cluster not running. Run '$0 setup' first."
         exit 1
     fi
-    
+
     echo -e "Select a drift scenario:\n"
     echo -e "  ${JADE}1${NC}) Replicas     ${GRAY}nginx: 3 → 5${NC}"
     echo -e "  ${JADE}2${NC}) Image        ${GRAY}nginx:1.25.0 → 1.26.0${NC}"
@@ -591,12 +612,16 @@ drift_menu() {
     echo -e "  ${JADE}6${NC}) Service      ${GRAY}ClusterIP → NodePort${NC}"
     echo -e "  ${JADE}7${NC}) Extra        ${GRAY}Add deployment not in manifests${NC}"
     echo -e "  ${JADE}8${NC}) Missing      ${GRAY}Delete redis (shows MISSING)${NC}"
+    echo ""
+    echo -e "  ${CYAN}Q${NC}) Quantity     ${GRAY}✓ Equivalent values (128Mi → bytes, should be NO drift)${NC}"
+    echo -e "  ${CYAN}R${NC}) Reorder      ${GRAY}✓ Reorder env vars (should be NO drift)${NC}"
+    echo ""
     echo -e "  ${YELLOW}A${NC}) ALL          ${GRAY}⚡ Apply everything! ⚡${NC}"
     echo -e "  ${GRAY}0${NC}) Cancel"
     echo ""
-    
-    read -rp "$(echo -e "${JADE}Select [1-8, A, 0]: ${NC}")" choice
-    
+
+    read -rp "$(echo -e "${JADE}Select [1-8, Q, R, A, 0]: ${NC}")" choice
+
     case $choice in
         1) drift_replicas ;;
         2) drift_image ;;
@@ -606,6 +631,8 @@ drift_menu() {
         6) drift_service ;;
         7) drift_extra ;;
         8) drift_missing ;;
+        [Qq]) drift_quantity_equiv ;;
+        [Rr]) drift_reorder_env ;;
         [Aa]) drift_all ;;
         0) info "Cancelled" ;;
         *) error "Invalid choice" ;;
@@ -784,6 +811,8 @@ ${JADE_BOLD}DRIFT SCENARIOS${NC}
     ${YELLOW}6${NC}) Service      ${GRAY}Change service type${NC}
     ${YELLOW}7${NC}) Extra        ${GRAY}Add untracked resource${NC}
     ${YELLOW}8${NC}) Missing      ${GRAY}Delete tracked resource${NC}
+    ${CYAN}Q${NC}) Quantity     ${GRAY}Equivalent values (should be NO drift)${NC}
+    ${CYAN}R${NC}) Reorder      ${GRAY}Reorder env vars (should be NO drift)${NC}
     ${YELLOW}A${NC}) ALL          ${GRAY}Apply everything!${NC}
 
 ${JADE_BOLD}REQUIREMENTS${NC}
