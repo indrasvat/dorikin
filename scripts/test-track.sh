@@ -77,8 +77,9 @@ COLIMA_PROFILE="dorikin-ae86"
 # Test namespace
 TEST_NAMESPACE="dorikin-garage"
 
-# Manifest directory
+# Manifest directories
 MANIFEST_DIR="${PROJECT_ROOT}/testdata/track-manifests"
+SMART_DIFF_DIR="${PROJECT_ROOT}/testdata/smart-diff"
 
 # Dorikin binary
 DORIKIN_BIN="${PROJECT_ROOT}/bin/dorikin"
@@ -578,64 +579,6 @@ drift_reorder_env() {
 # 🎯 SMART DIFF SCENARIOS - Test different render modes
 # ═══════════════════════════════════════════════════════════════════════════════
 
-drift_argo_script() {
-    info "Drift: Modifying Argo Workflow inline Python script"
-
-    # First, deploy the Argo workflow if not present
-    if ! kc get workflow data-pipeline -n "${TEST_NAMESPACE}" &>/dev/null; then
-        step "Deploying Argo Workflow..."
-        kc apply -f "${PROJECT_ROOT}/testdata/smart-diff/02-argo-workflow.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || {
-            # If Argo CRD not installed, create a ConfigMap with the script instead
-            warn "Argo CRDs not installed, creating ConfigMap with script"
-            kc create configmap data-pipeline-script -n "${TEST_NAMESPACE}" \
-                --from-literal=script.py="$(cat << 'SCRIPT'
-#!/usr/bin/env python3
-"""Original data extraction module."""
-import os
-import json
-import logging
-from datetime import datetime
-from typing import Dict, List, Any
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-class DataExtractor:
-    def __init__(self, source_path: str):
-        self.source_path = source_path
-        self.records = []
-
-    def extract(self):
-        logger.info(f"Extracting from {self.source_path}")
-        # Original extraction logic
-        return [{"id": i, "value": i*100} for i in range(100)]
-
-    def save_output(self, path: str):
-        os.makedirs(path, exist_ok=True)
-        with open(f"{path}/data.json", "w") as f:
-            json.dump(self.records, f)
-
-def main():
-    extractor = DataExtractor("s3://input")
-    extractor.extract()
-    extractor.save_output("/tmp/output")
-
-if __name__ == '__main__':
-    main()
-SCRIPT
-)" --dry-run=client -o yaml | kc apply -f -
-        }
-    fi
-
-    # Now modify the script with significant changes
-    kc patch configmap data-pipeline-script -n "${TEST_NAMESPACE}" --type merge \
-        -p '{"data":{"script.py":"#!/usr/bin/env python3\n\"\"\"MODIFIED: Enhanced data extraction module v2.0\"\"\"\nimport os\nimport json\nimport logging\nimport hashlib\nfrom datetime import datetime\nfrom typing import Dict, List, Any, Optional\nfrom dataclasses import dataclass\nimport asyncio\n\nlogging.basicConfig(level=logging.DEBUG, format=\"%(asctime)s - %(levelname)s - %(msg)s\")\nlogger = logging.getLogger(__name__)\n\n@dataclass\nclass DataRecord:\n    id: str\n    checksum: str\n    payload: Dict[str, Any]\n\nclass AsyncDataExtractor:\n    \"\"\"Async data extractor with batching support.\"\"\"\n    \n    def __init__(self, source: str, batch_size: int = 50):\n        self.source = source\n        self.batch_size = batch_size\n        self.records: List[DataRecord] = []\n\n    async def extract_batch(self, offset: int) -> List[DataRecord]:\n        logger.debug(f\"Extracting batch at offset {offset}\")\n        await asyncio.sleep(0.1)  # Simulate IO\n        return [\n            DataRecord(\n                id=f\"rec_{offset+i}\",\n                checksum=hashlib.md5(str(i).encode()).hexdigest(),\n                payload={\"value\": i * 100, \"batch\": offset // self.batch_size}\n            )\n            for i in range(self.batch_size)\n        ]\n\n    async def extract_all(self) -> List[DataRecord]:\n        tasks = [self.extract_batch(i) for i in range(0, 500, self.batch_size)]\n        batches = await asyncio.gather(*tasks)\n        self.records = [r for batch in batches for r in batch]\n        return self.records\n\n    def save(self, path: str) -> None:\n        os.makedirs(path, exist_ok=True)\n        with open(f\"{path}/enhanced_data.json\", \"w\") as f:\n            json.dump([{\"id\": r.id, \"checksum\": r.checksum, \"payload\": r.payload} for r in self.records], f, indent=2)\n\nasync def main():\n    extractor = AsyncDataExtractor(\"s3://data-lake/input\", batch_size=100)\n    await extractor.extract_all()\n    extractor.save(\"/tmp/output\")\n    logger.info(f\"Processed {len(extractor.records)} records\")\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"}}' 2>/dev/null || true
-
-    drift_alert
-    echo -e "  ${YELLOW}⚡${NC} Script substantially modified (async, batching, dataclasses)"
-    echo -e "  ${CYAN}→${NC} Tests ${CYAN}ModeUnifiedDiff${NC} rendering"
-}
-
 drift_configmap_yaml() {
     info "Drift: Modifying embedded YAML in app-config ConfigMap"
 
@@ -704,7 +647,6 @@ drift_all() {
     drift_extra; sleep 1
     drift_missing; sleep 1
     # Smart diff scenarios
-    drift_argo_script; sleep 1
     drift_configmap_yaml; sleep 1
     drift_sidecar_inject; sleep 1
     drift_replace_template
@@ -738,16 +680,15 @@ drift_menu() {
     echo -e "  ${CYAN}R${NC}) Reorder      ${GRAY}✓ Reorder env vars (should be NO drift)${NC}"
     echo ""
     echo -e "  ${PURPLE}Smart Diff Scenarios:${NC}"
-    echo -e "  ${PURPLE}10${NC}) Argo Script   ${GRAY}Modify inline Python script (ModeUnifiedDiff)${NC}"
-    echo -e "  ${PURPLE}11${NC}) ConfigMap YAML ${GRAY}Modify embedded YAML (ModeUnifiedDiff)${NC}"
-    echo -e "  ${PURPLE}12${NC}) Sidecar       ${GRAY}Inject sidecar container (ModeStructuralAdd)${NC}"
-    echo -e "  ${PURPLE}13${NC}) Replace       ${GRAY}Complete template replacement (ModeReplacement)${NC}"
+    echo -e "  ${PURPLE}10${NC}) ConfigMap YAML ${GRAY}Modify embedded YAML (ModeUnifiedDiff)${NC}"
+    echo -e "  ${PURPLE}11${NC}) Sidecar       ${GRAY}Inject sidecar container (ModeStructuralAdd)${NC}"
+    echo -e "  ${PURPLE}12${NC}) Replace       ${GRAY}Complete template replacement (ModeReplacement)${NC}"
     echo ""
     echo -e "  ${YELLOW}A${NC}) ALL          ${GRAY}⚡ Apply everything! ⚡${NC}"
     echo -e "  ${GRAY}0${NC}) Cancel"
     echo ""
 
-    read -rp "$(echo -e "${JADE}Select [1-8, 10-13, Q, R, A, 0]: ${NC}")" choice
+    read -rp "$(echo -e "${JADE}Select [1-8, 10-12, Q, R, A, 0]: ${NC}")" choice
 
     case $choice in
         1) drift_replicas ;;
@@ -760,10 +701,9 @@ drift_menu() {
         8) drift_missing ;;
         [Qq]) drift_quantity_equiv ;;
         [Rr]) drift_reorder_env ;;
-        10) drift_argo_script ;;
-        11) drift_configmap_yaml ;;
-        12) drift_sidecar_inject ;;
-        13) drift_replace_template ;;
+        10) drift_configmap_yaml ;;
+        11) drift_sidecar_inject ;;
+        12) drift_replace_template ;;
         [Aa]) drift_all ;;
         0) info "Cancelled" ;;
         *) error "Invalid choice" ;;
@@ -905,6 +845,107 @@ cleanup() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 🎨 Smart Diff Testing
+# ═══════════════════════════════════════════════════════════════════════════════
+
+smart_diff_setup() {
+    banner
+    section "Smart Diff Test Setup"
+
+    if ! colima_running; then
+        error "Cluster not running. Run '$0 setup' first."
+        exit 1
+    fi
+
+    ensure_built
+
+    # Ensure namespace exists
+    kc create namespace "${TEST_NAMESPACE}" 2>/dev/null || true
+
+    step "Applying smart-diff test manifests..."
+    # Apply each file individually to handle missing CRDs gracefully
+    for f in "${SMART_DIFF_DIR}"/*.yaml; do
+        if kc apply -f "$f" -n "${TEST_NAMESPACE}" 2>&1 | grep -q "no matches for kind"; then
+            warn "Skipping $(basename "$f") - CRD not installed"
+        fi
+    done 2>/dev/null || true
+
+    # Wait for deployments
+    step "Waiting for deployments..."
+    wait_ready deployment simple-nginx "${TEST_NAMESPACE}" 60 || true
+    wait_ready deployment sidecar-test "${TEST_NAMESPACE}" 60 || true
+    wait_ready deployment replacement-test "${TEST_NAMESPACE}" 60 || true
+
+    section "Smart Diff Setup Complete! 🏁"
+    success "Test manifests deployed - ready for drift scenarios 10-13"
+    echo ""
+    echo -e "  Run: ${CYAN}$0 smart-diff-tui${NC} to launch TUI with smart-diff manifests"
+    echo -e "  Run: ${CYAN}$0 drift${NC} and select 10-13 to apply smart diff scenarios"
+}
+
+smart_diff_reset() {
+    banner
+    section "Resetting Smart Diff Resources"
+
+    if ! colima_running; then
+        error "Cluster not running."
+        exit 1
+    fi
+
+    step "Re-applying smart-diff manifests..."
+    kc apply -f "${SMART_DIFF_DIR}/" -n "${TEST_NAMESPACE}"
+
+    # Wait for deployments to stabilize
+    wait_ready deployment simple-nginx "${TEST_NAMESPACE}" 60 || true
+    wait_ready deployment sidecar-test "${TEST_NAMESPACE}" 60 || true
+    wait_ready deployment replacement-test "${TEST_NAMESPACE}" 60 || true
+
+    section "Reset Complete! 🏁"
+    success "Smart diff resources restored to baseline"
+}
+
+smart_diff_tui() {
+    banner
+    section "Launching Smart Diff TUI"
+
+    if ! colima_running; then
+        error "Cluster not running. Run '$0 setup' first."
+        exit 1
+    fi
+
+    ensure_built
+
+    info "Launching dorikin TUI with smart-diff manifests..."
+    echo ""
+
+    "${DORIKIN_BIN}" ui \
+        --refresh-interval 2 \
+        -f "${SMART_DIFF_DIR}" \
+        -n "${TEST_NAMESPACE}" \
+        --context "$(get_context)"
+}
+
+smart_diff_scan() {
+    banner
+    section "Running Smart Diff Scan"
+
+    if ! colima_running; then
+        error "Cluster not running. Run '$0 setup' first."
+        exit 1
+    fi
+
+    ensure_built
+
+    info "Scanning smart-diff manifests..."
+    echo ""
+
+    "${DORIKIN_BIN}" scan \
+        -f "${SMART_DIFF_DIR}" \
+        -n "${TEST_NAMESPACE}" \
+        --context "$(get_context)"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 📖 Help
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -923,6 +964,12 @@ ${JADE_BOLD}COMMANDS${NC}
     ${CYAN}tui${NC}        Launch dorikin TUI
     ${CYAN}cleanup${NC}    Destroy test environment
     ${CYAN}help${NC}       Show this help
+
+${JADE_BOLD}SMART DIFF TESTING${NC}
+    ${PURPLE}smart-diff-setup${NC}   Deploy smart-diff test manifests
+    ${PURPLE}smart-diff-reset${NC}   Reset smart-diff resources to baseline
+    ${PURPLE}smart-diff-tui${NC}     Launch TUI with smart-diff manifests
+    ${PURPLE}smart-diff-scan${NC}    Scan smart-diff manifests
 
 ${JADE_BOLD}QUICK START${NC}
     $0 setup              ${GRAY}# Start cluster, deploy resources${NC}
@@ -944,6 +991,10 @@ ${JADE_BOLD}DRIFT SCENARIOS${NC}
     ${YELLOW}8${NC}) Missing      ${GRAY}Delete tracked resource${NC}
     ${CYAN}Q${NC}) Quantity     ${GRAY}Equivalent values (should be NO drift)${NC}
     ${CYAN}R${NC}) Reorder      ${GRAY}Reorder env vars (should be NO drift)${NC}
+    ${PURPLE}10${NC}) Argo Script  ${GRAY}Modify inline Python script${NC}
+    ${PURPLE}11${NC}) ConfigMap YAML ${GRAY}Modify embedded YAML${NC}
+    ${PURPLE}12${NC}) Sidecar      ${GRAY}Inject sidecar container${NC}
+    ${PURPLE}13${NC}) Replace      ${GRAY}Complete template replacement${NC}
     ${YELLOW}A${NC}) ALL          ${GRAY}Apply everything!${NC}
 
 ${JADE_BOLD}REQUIREMENTS${NC}
@@ -965,6 +1016,10 @@ main() {
         scan)    run_scan ;;
         tui)     run_tui ;;
         cleanup) cleanup ;;
+        smart-diff-setup) smart_diff_setup ;;
+        smart-diff-reset) smart_diff_reset ;;
+        smart-diff-tui)   smart_diff_tui ;;
+        smart-diff-scan)  smart_diff_scan ;;
         help|--help|-h) show_help ;;
         *) error "Unknown: $1"; show_help; exit 1 ;;
     esac

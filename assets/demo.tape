@@ -167,12 +167,12 @@ Left
 Sleep 500ms
 
 # Inject ConfigMap embedded YAML drift (tests ModeUnifiedDiff)
-Type "make track-drift <<< '11'"
+Type "make track-drift <<< '10'"
 Enter
 Sleep 3s
 
 # Inject sidecar container (tests ModeStructuralAdd)
-Type "make track-drift <<< '12'"
+Type "make track-drift <<< '11'"
 Enter
 Sleep 3s
 
