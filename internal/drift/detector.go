@@ -164,6 +164,8 @@ func (d *Detector) compareResource(resource api.Resource, fetchResult k8s.FetchR
 	// Handle missing resources
 	if !fetchResult.Found {
 		report.Status = api.StatusMissing
+		// Store manifest object for Manifest tab viewing
+		report.ManifestObject = deepCopyMap(resource.Object.Object)
 		return report
 	}
 
@@ -196,6 +198,9 @@ func (d *Detector) compareResource(resource api.Resource, fetchResult k8s.FetchR
 	} else {
 		report.Status = api.StatusDrifted
 		report.Diffs = diffs
+		// Store full objects for Manifest/Cluster tab viewing
+		report.ManifestObject = deepCopyMap(expected)
+		report.ClusterObject = deepCopyMap(actual)
 	}
 
 	return report
@@ -248,4 +253,40 @@ func calculateSummary(reports []api.DriftReport) api.ScanSummary {
 	}
 
 	return summary
+}
+
+// deepCopyMap creates a deep copy of a map[string]any.
+// This is used to store full objects without retaining references.
+func deepCopyMap(src map[string]any) map[string]any {
+	if src == nil {
+		return nil
+	}
+
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		dst[k] = deepCopyValue(v)
+	}
+	return dst
+}
+
+// deepCopyValue recursively copies a value.
+func deepCopyValue(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		return deepCopyMap(val)
+	case []any:
+		dst := make([]any, len(val))
+		for i, item := range val {
+			dst[i] = deepCopyValue(item)
+		}
+		return dst
+	default:
+		// Primitive types (string, int, float, bool, nil) are safe to copy directly
+		return v
+	}
+}
+
+// CurrentContext returns the current kubectl context name.
+func (d *Detector) CurrentContext() string {
+	return d.client.CurrentContext()
 }

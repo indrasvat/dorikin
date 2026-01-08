@@ -1,0 +1,55 @@
+# Test Scenario 1: Simple Scattered Changes
+# This deployment tests ModeSideBySide rendering
+# Drifts: replicas, image tag, resource limits, labels
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-app
+  namespace: dorikin-garage
+  labels:
+    app: simple-app
+    environment: staging
+    team: platform
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: simple-app
+  template:
+    metadata:
+      labels:
+        app: simple-app
+        version: v1.0.0
+    spec:
+      containers:
+      - name: app
+        image: myapp:v1.2.3
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: DATABASE_URL
+          value: postgres://db:5432/myapp
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 20

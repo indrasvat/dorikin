@@ -89,7 +89,7 @@ Enter
 Sleep 1s
 
 # We start in RIGHT pane (pane 1) - launch TUI
-Type "./bin/dorikin ui --refresh-interval 1 ./testdata/track-manifests 2>/dev/null"
+Type "./bin/dorikin ui --refresh-interval 1 ./testdata/track-manifests"
 Enter
 Sleep 3s
 
@@ -125,21 +125,166 @@ Ctrl+B
 Right
 Sleep 2s
 
-# Filter drifted only
-Type "o"
+# Default filter already hides OK resources - we see only drifted
+# Navigate to first drifted resource (Deployment/nginx)
+Sleep 1s
+
+# Show diff (enhanced detail pane with side-by-side view)
+Enter
 Sleep 2s
 
-# Navigate to drifted resource
+# Demonstrate tab cycling (1-4 keys) - show YAML tabs
+Type "2"
+Sleep 2s
+
+# Scroll down in Manifest YAML tab
 Down
 Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 1s
 
-# Show diff
+Type "3"
+Sleep 2s
+
+# Scroll down in Cluster YAML tab
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 1s
+
+Type "1"
+Sleep 1s
+
+# Scroll down to next diff
+Down
+Sleep 1s
+
+# Navigate to next resource (laps)
+Right
+Sleep 2s
+
+# Go back to list
+Escape
+Sleep 1s
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Demo: Smart Diff Rendering (Unified Diff, Structural Add)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Switch to left pane for more drift injection
+Ctrl+B
+Left
+Sleep 500ms
+
+# Inject ConfigMap embedded YAML drift (tests ModeUnifiedDiff)
+Type "make track-drift <<< '10'"
 Enter
 Sleep 3s
 
-# Go back
-Escape
+# Inject sidecar container (tests ModeStructuralAdd)
+Type "make track-drift <<< '11'"
+Enter
+Sleep 3s
+
+# Switch back to TUI
+Ctrl+B
+Right
 Sleep 2s
+
+# Navigate down to find the new drifted resources
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+
+# Enter detail view for ConfigMap (app-config)
+Enter
+Sleep 2s
+
+# Show the unified diff with +/- lines
+Down
+Sleep 1s
+Down
+Sleep 1s
+
+# Check Manifest tab to see full YAML
+Type "2"
+Sleep 2s
+
+# Scroll down in Manifest YAML
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 1s
+
+# Check Cluster tab
+Type "3"
+Sleep 2s
+
+# Scroll down in Cluster YAML
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 1s
+
+# Back to diffs tab
+Type "1"
+Sleep 1s
+
+# Go back to list
+Escape
+Sleep 1s
+
+# Navigate to sidecar-test deployment
+Down
+Sleep 500ms
+
+Enter
+Sleep 2s
+
+# Show the structurally added container
+Down
+Sleep 1s
+
+# Go back to list
+Escape
+Sleep 1s
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Demo: Show logs view
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Open logs view
+Type "L"
+Sleep 2s
+
+# Scroll down through logs
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 1s
+
+# Cycle log filter (all → info+ → warn+)
+Type "f"
+Sleep 1s
+Type "f"
+Sleep 2s
+
+# Return to list view
+Escape
+Sleep 1s
 
 # Quit TUI
 Type "q"

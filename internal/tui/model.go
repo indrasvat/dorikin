@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/indrasvat/dorikin/internal/logcapture"
 	"github.com/indrasvat/dorikin/internal/tui/styles"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
@@ -21,14 +22,26 @@ const (
 	ViewList ViewMode = iota
 	ViewDetail
 	ViewHelp
+	ViewLogs
+)
+
+// DetailTab represents the active tab in detail view.
+type DetailTab int
+
+const (
+	TabDiffs DetailTab = iota
+	TabManifest
+	TabCluster
+	TabMeta
 )
 
 // Model is the main TUI model.
 type Model struct {
 	// Data
-	result   *api.ScanResult
-	reports  []api.DriftReport
-	filtered []int // indices into reports
+	result      *api.ScanResult
+	reports     []api.DriftReport
+	filtered    []int // indices into reports
+	kubeContext string
 
 	// Refresh callback
 	scanFunc        ScanFunc
@@ -45,6 +58,16 @@ type Model struct {
 	height   int
 	ready    bool
 	quitting bool
+
+	// Detail view state
+	detailTab    DetailTab // Current tab in detail view
+	detailScroll int       // Scroll position within detail content
+	diffCursor   int       // Selected diff index
+
+	// Log capture
+	logCapture *logcapture.Capture
+	logsCursor int
+	logsFilter logcapture.Level
 
 	// Components
 	help   help.Model
@@ -65,6 +88,8 @@ type TickMsg time.Time
 type keyMap struct {
 	Up          key.Binding
 	Down        key.Binding
+	Left        key.Binding
+	Right       key.Binding
 	Enter       key.Binding
 	Escape      key.Binding
 	Tab         key.Binding
@@ -74,6 +99,8 @@ type keyMap struct {
 	Refresh     key.Binding
 	AutoRefresh key.Binding
 	ToggleOK    key.Binding
+	Logs        key.Binding
+	ClearLogs   key.Binding
 }
 
 // ShortHelp returns keybindings to be shown in the mini help view.
@@ -100,13 +127,21 @@ func defaultKeyMap() keyMap {
 			key.WithKeys("down", "j"),
 			key.WithHelp("↓/j", "down"),
 		),
+		Left: key.NewBinding(
+			key.WithKeys("left", "h"),
+			key.WithHelp("←/h", "prev"),
+		),
+		Right: key.NewBinding(
+			key.WithKeys("right", "l"),
+			key.WithHelp("→/l", "next"),
+		),
 		Enter: key.NewBinding(
-			key.WithKeys("enter", "l"),
-			key.WithHelp("↵/l", "details"),
+			key.WithKeys("enter"),
+			key.WithHelp("↵", "details"),
 		),
 		Escape: key.NewBinding(
-			key.WithKeys("esc", "h"),
-			key.WithHelp("esc/h", "back"),
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "back"),
 		),
 		Tab: key.NewBinding(
 			key.WithKeys("tab"),
@@ -135,6 +170,14 @@ func defaultKeyMap() keyMap {
 		ToggleOK: key.NewBinding(
 			key.WithKeys("o"),
 			key.WithHelp("o", "toggle ok"),
+		),
+		Logs: key.NewBinding(
+			key.WithKeys("L"),
+			key.WithHelp("L", "logs"),
+		),
+		ClearLogs: key.NewBinding(
+			key.WithKeys("c"),
+			key.WithHelp("c", "clear logs"),
 		),
 	}
 }
@@ -246,4 +289,13 @@ func (m *Model) updateFromResult(result *api.ScanResult) {
 	m.result = result
 	m.reports = result.Reports
 	m.applyFilter()
+}
+
+// NewModelWithCapture creates a new TUI model with log capture support.
+func NewModelWithCapture(result *api.ScanResult, scanFunc ScanFunc, interval time.Duration, capture *logcapture.Capture, kubeContext string) Model {
+	m := NewModelWithInterval(result, scanFunc, interval)
+	m.logCapture = capture
+	m.logsFilter = logcapture.LevelDebug // Show all levels by default
+	m.kubeContext = kubeContext
+	return m
 }

@@ -77,8 +77,9 @@ COLIMA_PROFILE="dorikin-ae86"
 # Test namespace
 TEST_NAMESPACE="dorikin-garage"
 
-# Manifest directory
+# Manifest directories
 MANIFEST_DIR="${PROJECT_ROOT}/testdata/track-manifests"
+SMART_DIFF_DIR="${PROJECT_ROOT}/testdata/smart-diff"
 
 # Dorikin binary
 DORIKIN_BIN="${PROJECT_ROOT}/bin/dorikin"
@@ -574,11 +575,69 @@ drift_reorder_env() {
     echo -e "  ${JADE}✓${NC} Dorikin should detect ${JADE}NO drift${NC} (content-based array matching)"
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🎯 SMART DIFF SCENARIOS - Test different render modes
+# ═══════════════════════════════════════════════════════════════════════════════
+
+drift_configmap_yaml() {
+    info "Drift: Modifying embedded YAML in app-config ConfigMap"
+
+    # First, deploy if not present
+    if ! kc get configmap app-config -n "${TEST_NAMESPACE}" &>/dev/null; then
+        step "Deploying app-config ConfigMap..."
+        kc apply -f "${PROJECT_ROOT}/testdata/track-manifests/09-configmap-yaml.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
+    fi
+
+    # Patch with significant YAML changes
+    kc patch configmap app-config -n "${TEST_NAMESPACE}" --type merge \
+        -p '{"data":{"application.yml":"# Spring Boot Application Configuration\n# Environment: PRODUCTION - MODIFIED!\n\nspring:\n  application:\n    name: myapp-prod\n    version: 2.0.0\n\n  profiles:\n    active: production\n\n  datasource:\n    url: jdbc:postgresql://db-prod:5432/myapp_prod\n    username: ${DB_USER}\n    password: ${DB_PASSWORD}\n    hikari:\n      minimum-idle: 10\n      maximum-pool-size: 50\n      idle-timeout: 60000\n\n  redis:\n    host: redis-prod\n    port: 6379\n    cluster:\n      enabled: true\n      nodes:\n        - redis-prod-0:6379\n        - redis-prod-1:6379\n        - redis-prod-2:6379\n\n  kafka:\n    bootstrap-servers: kafka-prod-0:9092,kafka-prod-1:9092\n    consumer:\n      group-id: myapp-prod-consumer\n\nserver:\n  port: 8443\n  ssl:\n    enabled: true\n    key-store: /etc/ssl/keystore.p12\n\nmanagement:\n  endpoints:\n    web:\n      exposure:\n        include: health,info,metrics,prometheus\n\ncache:\n  type: redis\n  redis:\n    host: redis-prod\n    ttl: 3600\n\nlogging:\n  level:\n    root: WARN\n    com.myapp: INFO\n"}}' 2>/dev/null || true
+
+    drift_alert
+    echo -e "  ${YELLOW}⚡${NC} application.yml modified (staging → production config)"
+    echo -e "  ${CYAN}→${NC} Tests ${CYAN}ModeUnifiedDiff${NC} for embedded YAML"
+}
+
+drift_sidecar_inject() {
+    info "Drift: Simulating Istio sidecar injection (adding container)"
+
+    # First, deploy if not present
+    if ! kc get deployment sidecar-test -n "${TEST_NAMESPACE}" &>/dev/null; then
+        step "Deploying sidecar-test Deployment..."
+        kc apply -f "${PROJECT_ROOT}/testdata/track-manifests/10-sidecar-base.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
+    fi
+
+    # Inject a simulated sidecar container
+    kc patch deployment sidecar-test -n "${TEST_NAMESPACE}" --type json \
+        -p '[{"op":"add","path":"/spec/template/spec/containers/-","value":{"name":"istio-proxy","image":"docker.io/istio/proxyv2:1.20.0","ports":[{"containerPort":15001,"name":"envoy","protocol":"TCP"},{"containerPort":15006,"name":"envoy-mtls","protocol":"TCP"},{"containerPort":15090,"name":"http-envoy-prom","protocol":"TCP"}],"args":["proxy","sidecar","--domain","$(POD_NAMESPACE).svc.cluster.local","--proxyLogLevel","warning","--proxyComponentLogLevel","misc:error"],"env":[{"name":"POD_NAME","valueFrom":{"fieldRef":{"fieldPath":"metadata.name"}}},{"name":"POD_NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"ISTIO_META_MESH_ID","value":"cluster.local"}],"resources":{"requests":{"cpu":"10m","memory":"40Mi"},"limits":{"cpu":"2000m","memory":"1Gi"}},"securityContext":{"runAsUser":1337,"runAsGroup":1337}}}]' 2>/dev/null || true
+
+    drift_alert
+    echo -e "  ${PURPLE}➕${NC} Container ${CYAN}istio-proxy${NC} injected"
+    echo -e "  ${CYAN}→${NC} Tests ${CYAN}ModeStructuralAdd${NC} rendering"
+}
+
+drift_replace_template() {
+    info "Drift: Complete template replacement (substantially different)"
+
+    # First, deploy if not present
+    if ! kc get deployment replacement-test -n "${TEST_NAMESPACE}" &>/dev/null; then
+        step "Deploying replacement-test Deployment..."
+        kc apply -f "${PROJECT_ROOT}/testdata/smart-diff/06-replacement-deploy.yaml" -n "${TEST_NAMESPACE}" 2>/dev/null || true
+    fi
+
+    # Replace with completely different template
+    kc patch deployment replacement-test -n "${TEST_NAMESPACE}" --type strategic \
+        -p '{"spec":{"replicas":3,"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxSurge":"25%","maxUnavailable":"25%"}},"template":{"metadata":{"labels":{"version":"v3.0.0","architecture":"microservices"},"annotations":{"config-hash":"completely-new-hash"}},"spec":{"containers":[{"name":"app","image":"totally-different-image:v3.0.0","command":["/bin/new-entrypoint","--mode=production","--workers=4"],"ports":[{"containerPort":8443,"name":"https"},{"containerPort":9090,"name":"metrics"},{"containerPort":5000,"name":"grpc"}],"env":[{"name":"MODE","value":"production"},{"name":"WORKERS","value":"4"},{"name":"ENABLE_TLS","value":"true"},{"name":"LOG_FORMAT","value":"structured"}],"resources":{"requests":{"cpu":"500m","memory":"1Gi"},"limits":{"cpu":"2000m","memory":"4Gi"}},"volumeMounts":[{"name":"tls-certs","mountPath":"/etc/tls","readOnly":true}]}],"volumes":[{"name":"tls-certs","secret":{"secretName":"app-tls"}}]}}}}' 2>/dev/null || true
+
+    drift_alert
+    echo -e "  ${YELLOW}⚡${NC} Template substantially rewritten (>75% different)"
+    echo -e "  ${CYAN}→${NC} Tests ${CYAN}ModeReplacement${NC} rendering"
+}
+
 drift_all() {
     section "Applying ALL Drift Scenarios"
     warn "Maximum drift incoming!"
     echo ""
-    
+
     drift_replicas; sleep 1
     drift_image; sleep 1
     drift_configmap; sleep 1
@@ -586,8 +645,12 @@ drift_all() {
     drift_resources; sleep 1
     drift_service; sleep 1
     drift_extra; sleep 1
-    drift_missing
-    
+    drift_missing; sleep 1
+    # Smart diff scenarios
+    drift_configmap_yaml; sleep 1
+    drift_sidecar_inject; sleep 1
+    drift_replace_template
+
     section "Maximum Drift Achieved! 🚨"
     echo -e "${BG_YELLOW}${BLACK}  ⚡⚡⚡ TOKYO DRIFT MODE ACTIVATED ⚡⚡⚡  ${NC}"
     echo ""
@@ -616,11 +679,16 @@ drift_menu() {
     echo -e "  ${CYAN}Q${NC}) Quantity     ${GRAY}✓ Equivalent values (128Mi → bytes, should be NO drift)${NC}"
     echo -e "  ${CYAN}R${NC}) Reorder      ${GRAY}✓ Reorder env vars (should be NO drift)${NC}"
     echo ""
+    echo -e "  ${PURPLE}Smart Diff Scenarios:${NC}"
+    echo -e "  ${PURPLE}10${NC}) ConfigMap YAML ${GRAY}Modify embedded YAML (ModeUnifiedDiff)${NC}"
+    echo -e "  ${PURPLE}11${NC}) Sidecar       ${GRAY}Inject sidecar container (ModeStructuralAdd)${NC}"
+    echo -e "  ${PURPLE}12${NC}) Replace       ${GRAY}Complete template replacement (ModeReplacement)${NC}"
+    echo ""
     echo -e "  ${YELLOW}A${NC}) ALL          ${GRAY}⚡ Apply everything! ⚡${NC}"
     echo -e "  ${GRAY}0${NC}) Cancel"
     echo ""
 
-    read -rp "$(echo -e "${JADE}Select [1-8, Q, R, A, 0]: ${NC}")" choice
+    read -rp "$(echo -e "${JADE}Select [1-8, 10-12, Q, R, A, 0]: ${NC}")" choice
 
     case $choice in
         1) drift_replicas ;;
@@ -633,6 +701,9 @@ drift_menu() {
         8) drift_missing ;;
         [Qq]) drift_quantity_equiv ;;
         [Rr]) drift_reorder_env ;;
+        10) drift_configmap_yaml ;;
+        11) drift_sidecar_inject ;;
+        12) drift_replace_template ;;
         [Aa]) drift_all ;;
         0) info "Cancelled" ;;
         *) error "Invalid choice" ;;
@@ -774,6 +845,107 @@ cleanup() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 🎨 Smart Diff Testing
+# ═══════════════════════════════════════════════════════════════════════════════
+
+smart_diff_setup() {
+    banner
+    section "Smart Diff Test Setup"
+
+    if ! colima_running; then
+        error "Cluster not running. Run '$0 setup' first."
+        exit 1
+    fi
+
+    ensure_built
+
+    # Ensure namespace exists
+    kc create namespace "${TEST_NAMESPACE}" 2>/dev/null || true
+
+    step "Applying smart-diff test manifests..."
+    # Apply each file individually to handle missing CRDs gracefully
+    for f in "${SMART_DIFF_DIR}"/*.yaml; do
+        if kc apply -f "$f" -n "${TEST_NAMESPACE}" 2>&1 | grep -q "no matches for kind"; then
+            warn "Skipping $(basename "$f") - CRD not installed"
+        fi
+    done 2>/dev/null || true
+
+    # Wait for deployments
+    step "Waiting for deployments..."
+    wait_ready deployment simple-nginx "${TEST_NAMESPACE}" 60 || true
+    wait_ready deployment sidecar-test "${TEST_NAMESPACE}" 60 || true
+    wait_ready deployment replacement-test "${TEST_NAMESPACE}" 60 || true
+
+    section "Smart Diff Setup Complete! 🏁"
+    success "Test manifests deployed - ready for drift scenarios 10-13"
+    echo ""
+    echo -e "  Run: ${CYAN}$0 smart-diff-tui${NC} to launch TUI with smart-diff manifests"
+    echo -e "  Run: ${CYAN}$0 drift${NC} and select 10-13 to apply smart diff scenarios"
+}
+
+smart_diff_reset() {
+    banner
+    section "Resetting Smart Diff Resources"
+
+    if ! colima_running; then
+        error "Cluster not running."
+        exit 1
+    fi
+
+    step "Re-applying smart-diff manifests..."
+    kc apply -f "${SMART_DIFF_DIR}/" -n "${TEST_NAMESPACE}"
+
+    # Wait for deployments to stabilize
+    wait_ready deployment simple-nginx "${TEST_NAMESPACE}" 60 || true
+    wait_ready deployment sidecar-test "${TEST_NAMESPACE}" 60 || true
+    wait_ready deployment replacement-test "${TEST_NAMESPACE}" 60 || true
+
+    section "Reset Complete! 🏁"
+    success "Smart diff resources restored to baseline"
+}
+
+smart_diff_tui() {
+    banner
+    section "Launching Smart Diff TUI"
+
+    if ! colima_running; then
+        error "Cluster not running. Run '$0 setup' first."
+        exit 1
+    fi
+
+    ensure_built
+
+    info "Launching dorikin TUI with smart-diff manifests..."
+    echo ""
+
+    "${DORIKIN_BIN}" ui \
+        --refresh-interval 2 \
+        -f "${SMART_DIFF_DIR}" \
+        -n "${TEST_NAMESPACE}" \
+        --context "$(get_context)"
+}
+
+smart_diff_scan() {
+    banner
+    section "Running Smart Diff Scan"
+
+    if ! colima_running; then
+        error "Cluster not running. Run '$0 setup' first."
+        exit 1
+    fi
+
+    ensure_built
+
+    info "Scanning smart-diff manifests..."
+    echo ""
+
+    "${DORIKIN_BIN}" scan \
+        -f "${SMART_DIFF_DIR}" \
+        -n "${TEST_NAMESPACE}" \
+        --context "$(get_context)"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 📖 Help
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -792,6 +964,12 @@ ${JADE_BOLD}COMMANDS${NC}
     ${CYAN}tui${NC}        Launch dorikin TUI
     ${CYAN}cleanup${NC}    Destroy test environment
     ${CYAN}help${NC}       Show this help
+
+${JADE_BOLD}SMART DIFF TESTING${NC}
+    ${PURPLE}smart-diff-setup${NC}   Deploy smart-diff test manifests
+    ${PURPLE}smart-diff-reset${NC}   Reset smart-diff resources to baseline
+    ${PURPLE}smart-diff-tui${NC}     Launch TUI with smart-diff manifests
+    ${PURPLE}smart-diff-scan${NC}    Scan smart-diff manifests
 
 ${JADE_BOLD}QUICK START${NC}
     $0 setup              ${GRAY}# Start cluster, deploy resources${NC}
@@ -813,6 +991,10 @@ ${JADE_BOLD}DRIFT SCENARIOS${NC}
     ${YELLOW}8${NC}) Missing      ${GRAY}Delete tracked resource${NC}
     ${CYAN}Q${NC}) Quantity     ${GRAY}Equivalent values (should be NO drift)${NC}
     ${CYAN}R${NC}) Reorder      ${GRAY}Reorder env vars (should be NO drift)${NC}
+    ${PURPLE}10${NC}) Argo Script  ${GRAY}Modify inline Python script${NC}
+    ${PURPLE}11${NC}) ConfigMap YAML ${GRAY}Modify embedded YAML${NC}
+    ${PURPLE}12${NC}) Sidecar      ${GRAY}Inject sidecar container${NC}
+    ${PURPLE}13${NC}) Replace      ${GRAY}Complete template replacement${NC}
     ${YELLOW}A${NC}) ALL          ${GRAY}Apply everything!${NC}
 
 ${JADE_BOLD}REQUIREMENTS${NC}
@@ -834,6 +1016,10 @@ main() {
         scan)    run_scan ;;
         tui)     run_tui ;;
         cleanup) cleanup ;;
+        smart-diff-setup) smart_diff_setup ;;
+        smart-diff-reset) smart_diff_reset ;;
+        smart-diff-tui)   smart_diff_tui ;;
+        smart-diff-scan)  smart_diff_scan ;;
         help|--help|-h) show_help ;;
         *) error "Unknown: $1"; show_help; exit 1 ;;
     esac

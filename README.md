@@ -165,6 +165,8 @@ dorikin ui -c staging ./manifests/
 |------|-------|-------------|
 | `--kubeconfig` | `-k` | Path to kubeconfig file |
 | `--context` | `-c` | Kubernetes context to use |
+| `--debug` | | Enable debug logging to `~/.cache/dorikin/debug.log` |
+| `--log-file` | | Write logs to specified file (implies `--debug`) |
 
 ### Scan Command
 
@@ -208,18 +210,41 @@ dorikin ui [flags] [paths...]
 
 ## TUI Controls
 
+### List View
+
 | Key | Action |
 |-----|--------|
 | `↑` / `k` | Navigate up |
 | `↓` / `j` | Navigate down |
-| `Enter` / `l` | View resource details |
-| `Esc` / `h` | Go back |
+| `Enter` | View resource details |
 | `f` | Cycle status filter |
 | `o` | Toggle IN_SYNC visibility |
 | `r` | Manual refresh |
 | `a` | Toggle auto-refresh |
+| `L` | Open logs view |
 | `?` | Show help |
 | `q` | Quit |
+
+### Detail View
+
+| Key | Action |
+|-----|--------|
+| `1`-`4` | Switch tabs (Diffs, Manifest, Cluster, Meta) |
+| `Tab` | Cycle through tabs |
+| `↑` / `k` | Scroll up through diffs |
+| `↓` / `j` | Scroll down through diffs |
+| `←` / `h` | Previous resource (lap) |
+| `→` / `l` | Next resource (lap) |
+| `Esc` | Return to list view |
+
+### Logs View
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Scroll through logs |
+| `f` | Cycle log level filter (all → info+ → warn+ → error) |
+| `c` | Clear logs |
+| `Esc` | Return to list view |
 
 ## Test Track
 

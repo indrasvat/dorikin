@@ -28,8 +28,18 @@ var (
 	StatusError   = lipgloss.Color("#FF6B6B")
 
 	// Subtle colors
-	Subtle = lipgloss.Color("#626262")
-	Dim    = lipgloss.Color("#4A4A4A")
+	Subtle   = lipgloss.Color("#626262")
+	Dim      = lipgloss.Color("#4A4A4A")
+	YAMLText = lipgloss.Color("#A0A0A0") // Brighter color for YAML content
+
+	// Selection colors
+	SelectionGreen = lipgloss.Color("#2A3D2A") // Dark green tint for selected row background
+
+	// Log level colors
+	LogDebugColor = Subtle
+	LogInfoColor  = AkinaBlue
+	LogWarnColor  = DriftYellow
+	LogErrorColor = TruenoRed
 )
 
 // App is the main application style container.
@@ -41,21 +51,23 @@ type App struct {
 	Content   lipgloss.Style
 
 	// Components
-	Title      lipgloss.Style
-	Subtitle   lipgloss.Style
-	StatusBar  lipgloss.Style
-	HelpKey    lipgloss.Style
-	HelpDesc   lipgloss.Style
-	HelpSep    lipgloss.Style
-	Tab        lipgloss.Style
-	TabActive  lipgloss.Style
-	TabContent lipgloss.Style
+	Title          lipgloss.Style
+	Subtitle       lipgloss.Style
+	StatusBar      lipgloss.Style
+	ClusterContext lipgloss.Style
+	HelpKey        lipgloss.Style
+	HelpDesc       lipgloss.Style
+	HelpSep        lipgloss.Style
+	Tab            lipgloss.Style
+	TabActive      lipgloss.Style
+	TabContent     lipgloss.Style
 
 	// Table
-	TableHeader   lipgloss.Style
-	TableRow      lipgloss.Style
-	TableSelected lipgloss.Style
-	TableCell     lipgloss.Style
+	TableHeader     lipgloss.Style
+	TableRow        lipgloss.Style
+	TableSelected   lipgloss.Style
+	TableCell       lipgloss.Style
+	SelectionCursor lipgloss.Style
 
 	// Status indicators
 	InSync  lipgloss.Style
@@ -65,12 +77,22 @@ type App struct {
 	Error   lipgloss.Style
 
 	// Diff view
-	DiffAdd    lipgloss.Style
-	DiffRemove lipgloss.Style
-	DiffPath   lipgloss.Style
+	DiffAdd     lipgloss.Style
+	DiffRemove  lipgloss.Style
+	DiffPath    lipgloss.Style
+	DiffHunk    lipgloss.Style // @@ -1,3 +1,4 @@ hunk headers
+	DiffContext lipgloss.Style // Unchanged context lines
 
 	// Text styles
-	Subtle lipgloss.Style
+	Subtle   lipgloss.Style
+	YAMLText lipgloss.Style // Brighter style for YAML content
+
+	// Log level styles
+	LogDebug lipgloss.Style
+	LogInfo  lipgloss.Style
+	LogWarn  lipgloss.Style
+	LogError lipgloss.Style
+	LogTime  lipgloss.Style
 }
 
 // New creates a new App style set.
@@ -112,6 +134,11 @@ func New() *App {
 			Background(MidnightGray).
 			Padding(0, 1),
 
+		ClusterContext: lipgloss.NewStyle().
+			Foreground(AkinaBlue).
+			Background(lipgloss.Color("#1A2A3A")).
+			Padding(0, 1),
+
 		HelpKey: lipgloss.NewStyle().
 			Foreground(DriftYellow).
 			Bold(true),
@@ -146,12 +173,20 @@ func New() *App {
 			Padding(0, 1),
 
 		TableSelected: lipgloss.NewStyle().
-			Background(lipgloss.Color("#2D2D2D")).
+			Background(SelectionGreen).
+			Foreground(PandaWhite).
 			Bold(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderLeft(true).
+			BorderForeground(TokyoNeon).
 			Padding(0, 1),
 
 		TableCell: lipgloss.NewStyle().
 			Padding(0, 1),
+
+		SelectionCursor: lipgloss.NewStyle().
+			Foreground(TokyoNeon).
+			Bold(true),
 
 		// Status indicators
 		InSync: lipgloss.NewStyle().
@@ -185,8 +220,36 @@ func New() *App {
 			Foreground(AkinaBlue).
 			Bold(true),
 
+		DiffHunk: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00BFFF")). // Cyan for @@ headers
+			Bold(true),
+
+		DiffContext: lipgloss.NewStyle().
+			Foreground(Subtle),
+
 		// Text styles
 		Subtle: lipgloss.NewStyle().
+			Foreground(Subtle),
+
+		YAMLText: lipgloss.NewStyle().
+			Foreground(YAMLText),
+
+		// Log level styles
+		LogDebug: lipgloss.NewStyle().
+			Foreground(LogDebugColor),
+
+		LogInfo: lipgloss.NewStyle().
+			Foreground(LogInfoColor),
+
+		LogWarn: lipgloss.NewStyle().
+			Foreground(LogWarnColor).
+			Bold(true),
+
+		LogError: lipgloss.NewStyle().
+			Foreground(LogErrorColor).
+			Bold(true),
+
+		LogTime: lipgloss.NewStyle().
 			Foreground(Subtle),
 	}
 }
