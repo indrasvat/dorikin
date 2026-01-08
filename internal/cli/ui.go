@@ -43,6 +43,15 @@ var (
 	uiIgnore          []string
 	uiRefreshInterval int
 	uiHPAAware        string
+
+	// Helm flags
+	uiHelm        bool
+	uiHelmRelease string
+	uiHelmValues  []string
+	uiHelmSet     []string
+
+	// Kustomize flags
+	uiKustomize bool
 )
 
 func init() {
@@ -54,6 +63,15 @@ func init() {
 	uiCmd.Flags().StringSliceVar(&uiIgnore, "ignore", nil, "field paths to ignore (overrides config file)")
 	uiCmd.Flags().IntVar(&uiRefreshInterval, "refresh-interval", 5, "auto-refresh interval in seconds (press 'a' to toggle)")
 	uiCmd.Flags().StringVar(&uiHPAAware, "hpa-aware", "", "HPA awareness mode: manifests (default), cluster, disabled")
+
+	// Helm flags
+	uiCmd.Flags().BoolVar(&uiHelm, "helm", false, "load manifests from Helm chart (run helm template)")
+	uiCmd.Flags().StringVar(&uiHelmRelease, "helm-release", "release", "Helm release name for templating")
+	uiCmd.Flags().StringSliceVar(&uiHelmValues, "helm-values", nil, "Helm values files (can be repeated)")
+	uiCmd.Flags().StringSliceVar(&uiHelmSet, "helm-set", nil, "Helm --set values (can be repeated)")
+
+	// Kustomize flags
+	uiCmd.Flags().BoolVar(&uiKustomize, "kustomize", false, "load manifests from Kustomize directory (run kustomize build)")
 }
 
 func runUI(cmd *cobra.Command, args []string) error {
@@ -96,8 +114,14 @@ func runUI(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	// Create detector with config
-	detector := drift.NewDetectorWithConfig(client, cfg, ignorePaths)
+	// Select loader based on flags
+	ldr, err := buildLoader(uiHelm, uiKustomize, uiHelmRelease, uiNamespace, uiHelmValues, uiHelmSet)
+	if err != nil {
+		return err
+	}
+
+	// Create detector with config and loader
+	detector := drift.NewDetector(client, ignorePaths, drift.WithConfig(cfg), drift.WithLoader(ldr))
 
 	// Parse HPA awareness mode
 	hpaMode, err := parseHPAAwareMode(hpaModeStr)

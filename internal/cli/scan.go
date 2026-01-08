@@ -9,6 +9,7 @@ import (
 	"github.com/indrasvat/dorikin/internal/config"
 	"github.com/indrasvat/dorikin/internal/drift"
 	"github.com/indrasvat/dorikin/internal/k8s"
+	"github.com/indrasvat/dorikin/internal/loader"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
 
@@ -42,6 +43,15 @@ var (
 	scanOutput    string
 	scanIgnore    []string
 	scanHPAAware  string
+
+	// Helm flags
+	scanHelm        bool
+	scanHelmRelease string
+	scanHelmValues  []string
+	scanHelmSet     []string
+
+	// Kustomize flags
+	scanKustomize bool
 )
 
 func init() {
@@ -53,6 +63,15 @@ func init() {
 	scanCmd.Flags().StringVarP(&scanOutput, "output", "o", "table", "output format: table, json, yaml, quiet")
 	scanCmd.Flags().StringSliceVar(&scanIgnore, "ignore", nil, "field paths to ignore (overrides config file)")
 	scanCmd.Flags().StringVar(&scanHPAAware, "hpa-aware", "", "HPA awareness mode: manifests (default), cluster, disabled")
+
+	// Helm flags
+	scanCmd.Flags().BoolVar(&scanHelm, "helm", false, "load manifests from Helm chart (run helm template)")
+	scanCmd.Flags().StringVar(&scanHelmRelease, "helm-release", "release", "Helm release name for templating")
+	scanCmd.Flags().StringSliceVar(&scanHelmValues, "helm-values", nil, "Helm values files (can be repeated)")
+	scanCmd.Flags().StringSliceVar(&scanHelmSet, "helm-set", nil, "Helm --set values (can be repeated)")
+
+	// Kustomize flags
+	scanCmd.Flags().BoolVar(&scanKustomize, "kustomize", false, "load manifests from Kustomize directory (run kustomize build)")
 }
 
 func runScan(cmd *cobra.Command, args []string) error {
@@ -95,8 +114,14 @@ func runScan(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	// Create detector with config
-	detector := drift.NewDetectorWithConfig(client, cfg, ignorePaths)
+	// Select loader based on flags
+	ldr, err := buildLoader(scanHelm, scanKustomize, scanHelmRelease, scanNamespace, scanHelmValues, scanHelmSet)
+	if err != nil {
+		return err
+	}
+
+	// Create detector with config and loader
+	detector := drift.NewDetector(client, ignorePaths, drift.WithConfig(cfg), drift.WithLoader(ldr))
 
 	// Parse HPA awareness mode
 	hpaMode, err := parseHPAAwareMode(hpaModeStr)
@@ -144,5 +169,36 @@ func parseHPAAwareMode(mode string) (api.HPAAwareMode, error) {
 		return api.HPAAwareModeDisabled, nil
 	default:
 		return "", fmt.Errorf("invalid --hpa-aware mode: %q (valid: manifests, cluster, disabled)", mode)
+	}
+}
+
+// buildLoader creates the appropriate loader based on flags.
+func buildLoader(helm, kustomize bool, helmRelease, namespace string, helmValues, helmSet []string) (loader.Loader, error) {
+	// Validate mutually exclusive flags
+	if helm && kustomize {
+		return nil, fmt.Errorf("--helm and --kustomize are mutually exclusive")
+	}
+
+	switch {
+	case helm:
+		opts := []loader.HelmOption{
+			loader.WithRelease(helmRelease),
+		}
+		if namespace != "" {
+			opts = append(opts, loader.WithNamespace(namespace))
+		}
+		if len(helmValues) > 0 {
+			opts = append(opts, loader.WithValues(helmValues))
+		}
+		if len(helmSet) > 0 {
+			opts = append(opts, loader.WithSet(helmSet))
+		}
+		return loader.NewHelmLoader(opts...), nil
+
+	case kustomize:
+		return loader.NewKustomizeLoader(), nil
+
+	default:
+		return loader.NewFileLoader(), nil
 	}
 }
