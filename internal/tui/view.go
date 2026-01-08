@@ -172,7 +172,14 @@ func (m Model) renderList() string {
 			)
 		}
 
-		row := fmt.Sprintf("  %s %s  %s", icon, statusText, resourceName)
+		// Build row with selection indicator
+		var prefix string
+		if i == m.cursor {
+			prefix = m.styles.SelectionCursor.Render("▶ ")
+		} else {
+			prefix = "  "
+		}
+		row := fmt.Sprintf("%s%s %s  %s", prefix, icon, statusText, resourceName)
 
 		// Add diff count for drifted resources
 		if report.Status == api.StatusDrifted && len(report.Diffs) > 0 {

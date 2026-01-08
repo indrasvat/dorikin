@@ -30,6 +30,9 @@ var (
 	// Subtle colors
 	Subtle = lipgloss.Color("#626262")
 	Dim    = lipgloss.Color("#4A4A4A")
+
+	// Selection colors
+	SelectionGreen = lipgloss.Color("#2A3D2A") // Dark green tint for selected row background
 )
 
 // App is the main application style container.
@@ -52,10 +55,11 @@ type App struct {
 	TabContent lipgloss.Style
 
 	// Table
-	TableHeader   lipgloss.Style
-	TableRow      lipgloss.Style
-	TableSelected lipgloss.Style
-	TableCell     lipgloss.Style
+	TableHeader     lipgloss.Style
+	TableRow        lipgloss.Style
+	TableSelected   lipgloss.Style
+	TableCell       lipgloss.Style
+	SelectionCursor lipgloss.Style
 
 	// Status indicators
 	InSync  lipgloss.Style
@@ -146,12 +150,20 @@ func New() *App {
 			Padding(0, 1),
 
 		TableSelected: lipgloss.NewStyle().
-			Background(lipgloss.Color("#2D2D2D")).
+			Background(SelectionGreen).
+			Foreground(PandaWhite).
 			Bold(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderLeft(true).
+			BorderForeground(TokyoNeon).
 			Padding(0, 1),
 
 		TableCell: lipgloss.NewStyle().
 			Padding(0, 1),
+
+		SelectionCursor: lipgloss.NewStyle().
+			Foreground(TokyoNeon).
+			Bold(true),
 
 		// Status indicators
 		InSync: lipgloss.NewStyle().
