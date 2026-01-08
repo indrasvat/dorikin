@@ -112,19 +112,28 @@ run-scan: build ## Run a scan (development)
 test: ## Run tests
 	@echo "$(COLOR_BLUE)▶ Running tests...$(COLOR_RESET)"
 ifdef GOTESTSUM
-	gotestsum --format pkgname-and-test-fails -- -race -shuffle=on ./...
+	gotestsum --format pkgname-and-test-fails --format-icons hivis -- -race -shuffle=on ./...
 else
 	go test -race -shuffle=on ./...
 endif
 	@echo "$(COLOR_GREEN)✓ Tests passed$(COLOR_RESET)"
 
 .PHONY: test-v
-test-v: ## Run tests with verbose output
+test-v: ## Run tests with verbose output (BDD-style)
 	@echo "$(COLOR_BLUE)▶ Running tests (verbose)...$(COLOR_RESET)"
 ifdef GOTESTSUM
-	gotestsum --format standard-verbose -- -race -shuffle=on ./...
+	gotestsum --format testdox --format-icons hivis -- -race -shuffle=on ./...
 else
 	go test -race -shuffle=on -v ./...
+endif
+
+.PHONY: test-dots
+test-dots: ## Run tests with dots output (fast feedback)
+	@echo "$(COLOR_BLUE)▶ Running tests...$(COLOR_RESET)"
+ifdef GOTESTSUM
+	gotestsum --format dots --format-icons hivis -- -race -shuffle=on ./...
+else
+	go test -race -shuffle=on ./...
 endif
 
 .PHONY: test-cover
@@ -132,7 +141,7 @@ test-cover: ## Run tests with coverage
 	@echo "$(COLOR_BLUE)▶ Running tests with coverage...$(COLOR_RESET)"
 	@mkdir -p $(COVERAGE_DIR)
 ifdef GOTESTSUM
-	gotestsum --format pkgname-and-test-fails -- -race -shuffle=on -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic ./...
+	gotestsum --format pkgname-and-test-fails --format-icons hivis -- -race -shuffle=on -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic ./...
 else
 	go test -race -shuffle=on -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic ./...
 endif
@@ -144,7 +153,7 @@ endif
 test-short: ## Run short tests only
 	@echo "$(COLOR_BLUE)▶ Running short tests...$(COLOR_RESET)"
 ifdef GOTESTSUM
-	gotestsum --format pkgname-and-test-fails -- -race -shuffle=on -short ./...
+	gotestsum --format pkgname-and-test-fails --format-icons hivis -- -race -shuffle=on -short ./...
 else
 	go test -race -shuffle=on -short ./...
 endif
