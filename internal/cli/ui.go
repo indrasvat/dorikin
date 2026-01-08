@@ -2,12 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
+	"github.com/indrasvat/dorikin/internal/logcapture"
 	"github.com/indrasvat/dorikin/internal/tui"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
@@ -48,8 +47,21 @@ func init() {
 }
 
 func runUI(cmd *cobra.Command, args []string) error {
-	// Suppress klog output to prevent logs bleeding into TUI
-	klog.SetOutput(io.Discard)
+	// Initialize log capture system
+	capture, err := initLogCapture(cmd)
+	if err != nil {
+		return fmt.Errorf("initializing log capture: %w", err)
+	}
+
+	// Start capturing stderr to prevent logs bleeding into TUI
+	if err := capture.Start(); err != nil {
+		return fmt.Errorf("starting log capture: %w", err)
+	}
+	defer capture.Stop()
+
+	// Set as global for logging throughout the app
+	logcapture.SetGlobal(capture)
+	logcapture.Info("Starting dorikin TUI")
 
 	// Build scan context from common flags
 	ctx, err := BuildScanContext(cmd, args, &uiFlags)
@@ -63,12 +75,33 @@ func runUI(cmd *cobra.Command, args []string) error {
 	}
 
 	// Run initial scan
+	logcapture.Info("Running initial scan")
 	result, err := scanFunc()
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)
 	}
+	logcapture.Info("Initial scan complete: %d resources", len(result.Reports))
 
 	// Launch TUI with refresh capability and configurable interval
 	interval := time.Duration(uiRefreshInterval) * time.Second
-	return tui.RunWithInterval(result, scanFunc, interval)
+	return tui.RunWithCapture(result, scanFunc, interval, capture)
+}
+
+// initLogCapture creates and configures the log capture system based on CLI flags.
+func initLogCapture(cmd *cobra.Command) (*logcapture.Capture, error) {
+	debug, _ := cmd.Flags().GetBool("debug")
+	logFile, _ := cmd.Flags().GetString("log-file")
+
+	opts := logcapture.Options{
+		Debug: debug || logFile != "",
+	}
+
+	// Determine log file path
+	if logFile != "" {
+		opts.LogFile = logFile
+	} else if debug {
+		opts.LogFile = logcapture.DefaultLogFile()
+	}
+
+	return logcapture.New(opts), nil
 }

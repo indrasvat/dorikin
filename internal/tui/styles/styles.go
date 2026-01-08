@@ -33,6 +33,12 @@ var (
 
 	// Selection colors
 	SelectionGreen = lipgloss.Color("#2A3D2A") // Dark green tint for selected row background
+
+	// Log level colors
+	LogDebugColor = Subtle
+	LogInfoColor  = AkinaBlue
+	LogWarnColor  = DriftYellow
+	LogErrorColor = TruenoRed
 )
 
 // App is the main application style container.
@@ -75,6 +81,13 @@ type App struct {
 
 	// Text styles
 	Subtle lipgloss.Style
+
+	// Log level styles
+	LogDebug lipgloss.Style
+	LogInfo  lipgloss.Style
+	LogWarn  lipgloss.Style
+	LogError lipgloss.Style
+	LogTime  lipgloss.Style
 }
 
 // New creates a new App style set.
@@ -199,6 +212,24 @@ func New() *App {
 
 		// Text styles
 		Subtle: lipgloss.NewStyle().
+			Foreground(Subtle),
+
+		// Log level styles
+		LogDebug: lipgloss.NewStyle().
+			Foreground(LogDebugColor),
+
+		LogInfo: lipgloss.NewStyle().
+			Foreground(LogInfoColor),
+
+		LogWarn: lipgloss.NewStyle().
+			Foreground(LogWarnColor).
+			Bold(true),
+
+		LogError: lipgloss.NewStyle().
+			Foreground(LogErrorColor).
+			Bold(true),
+
+		LogTime: lipgloss.NewStyle().
 			Foreground(Subtle),
 	}
 }

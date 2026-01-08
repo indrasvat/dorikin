@@ -32,4 +32,6 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().StringP("kubeconfig", "k", "", "path to kubeconfig file")
 	rootCmd.PersistentFlags().StringP("context", "c", "", "kubernetes context to use")
+	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging to file")
+	rootCmd.PersistentFlags().String("log-file", "", "write logs to specified file (implies --debug)")
 }

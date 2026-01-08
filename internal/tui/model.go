@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/indrasvat/dorikin/internal/logcapture"
 	"github.com/indrasvat/dorikin/internal/tui/styles"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
@@ -21,6 +22,7 @@ const (
 	ViewList ViewMode = iota
 	ViewDetail
 	ViewHelp
+	ViewLogs
 )
 
 // Model is the main TUI model.
@@ -45,6 +47,11 @@ type Model struct {
 	height   int
 	ready    bool
 	quitting bool
+
+	// Log capture
+	logCapture *logcapture.Capture
+	logsCursor int
+	logsFilter logcapture.Level
 
 	// Components
 	help   help.Model
@@ -74,6 +81,8 @@ type keyMap struct {
 	Refresh     key.Binding
 	AutoRefresh key.Binding
 	ToggleOK    key.Binding
+	Logs        key.Binding
+	ClearLogs   key.Binding
 }
 
 // ShortHelp returns keybindings to be shown in the mini help view.
@@ -135,6 +144,14 @@ func defaultKeyMap() keyMap {
 		ToggleOK: key.NewBinding(
 			key.WithKeys("o"),
 			key.WithHelp("o", "toggle ok"),
+		),
+		Logs: key.NewBinding(
+			key.WithKeys("L"),
+			key.WithHelp("L", "logs"),
+		),
+		ClearLogs: key.NewBinding(
+			key.WithKeys("c"),
+			key.WithHelp("c", "clear logs"),
 		),
 	}
 }
@@ -246,4 +263,12 @@ func (m *Model) updateFromResult(result *api.ScanResult) {
 	m.result = result
 	m.reports = result.Reports
 	m.applyFilter()
+}
+
+// NewModelWithCapture creates a new TUI model with log capture support.
+func NewModelWithCapture(result *api.ScanResult, scanFunc ScanFunc, interval time.Duration, capture *logcapture.Capture) Model {
+	m := NewModelWithInterval(result, scanFunc, interval)
+	m.logCapture = capture
+	m.logsFilter = logcapture.LevelDebug // Show all levels by default
+	return m
 }

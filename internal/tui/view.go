@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/indrasvat/dorikin/internal/logcapture"
 	"github.com/indrasvat/dorikin/internal/tui/styles"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
@@ -26,6 +27,8 @@ func (m Model) View() string {
 		content = m.renderHelp()
 	case ViewDetail:
 		content = m.renderDetail()
+	case ViewLogs:
+		content = m.renderLogs()
 	default:
 		content = m.renderList()
 	}
@@ -110,6 +113,7 @@ func (m Model) renderFooter() string {
 			m.styles.HelpKey.Render("o")+m.styles.HelpDesc.Render(" toggle ok"),
 			m.styles.HelpKey.Render("r")+m.styles.HelpDesc.Render(" refresh"),
 			m.styles.HelpKey.Render("a")+m.styles.HelpDesc.Render(" auto"),
+			m.styles.HelpKey.Render("L")+m.styles.HelpDesc.Render(" logs"),
 			m.styles.HelpKey.Render("q")+m.styles.HelpDesc.Render(" quit"),
 		)
 	case ViewDetail:
@@ -120,6 +124,13 @@ func (m Model) renderFooter() string {
 		)
 	case ViewHelp:
 		hints = append(hints,
+			m.styles.HelpKey.Render("esc")+m.styles.HelpDesc.Render(" back"),
+		)
+	case ViewLogs:
+		hints = append(hints,
+			m.styles.HelpKey.Render("↑↓")+m.styles.HelpDesc.Render(" scroll"),
+			m.styles.HelpKey.Render("f")+m.styles.HelpDesc.Render(" filter level"),
+			m.styles.HelpKey.Render("c")+m.styles.HelpDesc.Render(" clear"),
 			m.styles.HelpKey.Render("esc")+m.styles.HelpDesc.Render(" back"),
 		)
 	}
@@ -306,4 +317,110 @@ func formatDiffValue(v any) string {
 		return s[:57] + "..."
 	}
 	return s
+}
+
+// renderLogs renders the logs view.
+func (m Model) renderLogs() string {
+	if m.logCapture == nil {
+		return m.styles.Subtitle.Render("\n  Log capture not available.\n")
+	}
+
+	entries := m.logCapture.FilteredEntries(m.logsFilter)
+
+	if len(entries) == 0 {
+		filterName := logLevelName(m.logsFilter)
+		return m.styles.Subtitle.Render(fmt.Sprintf("\n  No logs to display (filter: %s).\n", filterName))
+	}
+
+	var rows []string
+
+	// Header with entry count and filter
+	filterName := logLevelName(m.logsFilter)
+	header := fmt.Sprintf("  📋 Logs (%d entries, filter: %s)", len(entries), filterName)
+	rows = append(rows, m.styles.TableHeader.Render(header), "")
+
+	// Calculate visible range
+	visibleHeight := m.height - 12 // Account for header, footer, padding
+	if visibleHeight < 5 {
+		visibleHeight = 5
+	}
+
+	startIdx := 0
+	if m.logsCursor >= visibleHeight {
+		startIdx = m.logsCursor - visibleHeight + 1
+	}
+
+	endIdx := startIdx + visibleHeight
+	if endIdx > len(entries) {
+		endIdx = len(entries)
+	}
+
+	for i := startIdx; i < endIdx; i++ {
+		entry := entries[i]
+
+		// Format timestamp
+		timeStr := m.styles.LogTime.Render(entry.Time.Format("15:04:05.000"))
+
+		// Format level with appropriate style
+		var levelStr string
+		switch entry.Level {
+		case logcapture.LevelDebug:
+			levelStr = m.styles.LogDebug.Render("DEBUG")
+		case logcapture.LevelInfo:
+			levelStr = m.styles.LogInfo.Render("INFO ")
+		case logcapture.LevelWarn:
+			levelStr = m.styles.LogWarn.Render("WARN ")
+		case logcapture.LevelError:
+			levelStr = m.styles.LogError.Render("ERROR")
+		default:
+			levelStr = "     "
+		}
+
+		// Truncate message if too long
+		msg := entry.Message
+		maxMsgLen := m.width - 30
+		if maxMsgLen < 20 {
+			maxMsgLen = 20
+		}
+		if len(msg) > maxMsgLen {
+			msg = msg[:maxMsgLen-3] + "..."
+		}
+
+		// Build row
+		row := fmt.Sprintf("  %s  %s  %s", timeStr, levelStr, msg)
+
+		// Highlight selected row
+		if i == m.logsCursor {
+			row = m.styles.TableSelected.Render(row)
+		}
+
+		rows = append(rows, row)
+	}
+
+	// Scroll indicator
+	if len(entries) > visibleHeight {
+		scrollInfo := m.styles.Subtitle.Render(fmt.Sprintf(
+			"\n  Showing %d-%d of %d entries",
+			startIdx+1, endIdx, len(entries),
+		))
+		rows = append(rows, scrollInfo)
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+}
+
+// logLevelName returns the display name for a log level.
+func logLevelName(level logcapture.Level) string {
+	switch level {
+	case logcapture.LevelDebug:
+		return "all"
+	case logcapture.LevelInfo:
+		return "info+"
+	case logcapture.LevelWarn:
+		return "warn+"
+	case logcapture.LevelError:
+		return "error"
+	default:
+		return "all"
+	}
 }

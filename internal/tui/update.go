@@ -3,6 +3,8 @@ package tui
 import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/indrasvat/dorikin/internal/logcapture"
 )
 
 // Update handles messages and updates the model.
@@ -57,6 +59,8 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleHelpKeys(msg)
 	case ViewDetail:
 		return m.handleDetailKeys(msg)
+	case ViewLogs:
+		return m.handleLogsKeys(msg)
 	default:
 		return m.handleListKeys(msg)
 	}
@@ -88,25 +92,39 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.applyFilter()
 
 	case key.Matches(msg, m.keys.Refresh):
-		if !m.refreshing && m.scanFunc != nil {
-			m.refreshing = true
-			cmd := m.doRefresh()
-			return m, cmd
-		}
+		return m.handleRefresh()
 
 	case key.Matches(msg, m.keys.AutoRefresh):
-		m.autoRefresh = !m.autoRefresh
-		if m.autoRefresh {
-			// Start the auto-refresh cycle
-			cmd := m.tickCmd()
-			return m, cmd
-		}
-		return m, nil
+		return m.handleAutoRefresh()
 
 	case key.Matches(msg, m.keys.Help):
 		m.viewMode = ViewHelp
+
+	case key.Matches(msg, m.keys.Logs):
+		m.viewMode = ViewLogs
+		m.logsCursor = 0
 	}
 
+	return m, nil
+}
+
+// handleRefresh handles manual refresh trigger.
+func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
+	if !m.refreshing && m.scanFunc != nil {
+		m.refreshing = true
+		cmd := m.doRefresh()
+		return m, cmd
+	}
+	return m, nil
+}
+
+// handleAutoRefresh handles auto-refresh toggle.
+func (m Model) handleAutoRefresh() (tea.Model, tea.Cmd) {
+	m.autoRefresh = !m.autoRefresh
+	if m.autoRefresh {
+		cmd := m.tickCmd()
+		return m, cmd
+	}
 	return m, nil
 }
 
@@ -143,4 +161,67 @@ func (m Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// handleLogsKeys handles keys in logs view.
+func (m Model) handleLogsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.logCapture == nil {
+		// No log capture available, go back to list
+		if key.Matches(msg, m.keys.Escape) {
+			m.viewMode = ViewList
+		}
+		return m, nil
+	}
+
+	entries := m.logCapture.FilteredEntries(m.logsFilter)
+
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.viewMode = ViewList
+
+	case key.Matches(msg, m.keys.Up):
+		if m.logsCursor > 0 {
+			m.logsCursor--
+		}
+
+	case key.Matches(msg, m.keys.Down):
+		if m.logsCursor < len(entries)-1 {
+			m.logsCursor++
+		}
+
+	case key.Matches(msg, m.keys.Filter):
+		// Cycle through log level filters
+		m.cycleLogsFilter()
+		// Reset cursor if it's now out of bounds
+		newEntries := m.logCapture.FilteredEntries(m.logsFilter)
+		if m.logsCursor >= len(newEntries) {
+			m.logsCursor = max(0, len(newEntries)-1)
+		}
+
+	case key.Matches(msg, m.keys.ClearLogs):
+		m.logCapture.Clear()
+		m.logsCursor = 0
+	}
+
+	return m, nil
+}
+
+// cycleLogsFilter cycles through log level filters.
+func (m *Model) cycleLogsFilter() {
+	levels := []logcapture.Level{
+		logcapture.LevelDebug, // All
+		logcapture.LevelInfo,  // Info+
+		logcapture.LevelWarn,  // Warn+
+		logcapture.LevelError, // Error only
+	}
+
+	current := 0
+	for i, l := range levels {
+		if l == m.logsFilter {
+			current = i
+			break
+		}
+	}
+
+	m.logsFilter = levels[(current+1)%len(levels)]
 }
