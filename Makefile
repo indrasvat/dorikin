@@ -261,6 +261,7 @@ tools: ## Install development tools
 tools-ci: ## Install CI tools (minimal)
 	@echo "$(COLOR_BLUE)▶ Installing CI tools...$(COLOR_RESET)"
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2
+	go install gotest.tools/gotestsum@latest
 	@echo "$(COLOR_GREEN)✓ CI tools installed$(COLOR_RESET)"
 
 .PHONY: demo
