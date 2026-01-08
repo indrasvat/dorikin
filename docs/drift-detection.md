@@ -270,23 +270,63 @@ env:                          env:
 
 **Future:** Use `metadata.managedFields` to identify and optionally skip controller-owned fields.
 
-### No Helm/Kustomize Rendering
+### Helm and Kustomize Support
 
-**Current:** Dorikin reads raw YAML files only.
+**Solved:** Dorikin now supports native Helm and Kustomize integration. You can scan charts and overlays directly without manual rendering.
 
-**Limitation:** If you use Helm or Kustomize, you must render templates first:
+#### Helm Charts
 
 ```bash
-# Helm
-helm template my-release ./chart > rendered.yaml
-dorikin scan rendered.yaml
+# Scan a Helm chart
+dorikin scan --helm ./charts/myapp/
 
-# Kustomize
-kustomize build ./overlays/prod > rendered.yaml
-dorikin scan rendered.yaml
+# With custom release name and namespace
+dorikin scan --helm ./charts/myapp/ --helm-release production -n prod
+
+# With values files
+dorikin scan --helm ./charts/myapp/ --helm-values values-prod.yaml
+
+# With --set overrides
+dorikin scan --helm ./charts/myapp/ --helm-set image.tag=v1.2.3
+
+# Combine options
+dorikin scan --helm ./charts/myapp/ \
+    --helm-release prod \
+    --helm-values values.yaml \
+    --helm-set replicas=5 \
+    -n production
 ```
 
-**Future:** Native `--helm` and `--kustomize` flags for direct rendering.
+#### Kustomize Overlays
+
+```bash
+# Scan a Kustomize overlay
+dorikin scan --kustomize ./k8s/overlays/production/
+
+# With namespace filter
+dorikin scan --kustomize ./k8s/overlays/production/ -n my-namespace
+```
+
+#### TUI Support
+
+Both Helm and Kustomize flags work with the TUI:
+
+```bash
+# Launch TUI with Helm chart
+dorikin ui --helm ./charts/myapp/ -n production
+
+# Launch TUI with Kustomize overlay
+dorikin ui --kustomize ./k8s/overlays/prod/
+```
+
+#### Requirements
+
+| Loader | Required Binary |
+|--------|----------------|
+| `--helm` | `helm` in PATH |
+| `--kustomize` | `kustomize` in PATH |
+
+Clear error messages are provided if the required binaries are not found.
 
 ### Quantity String Comparison
 
@@ -309,10 +349,10 @@ Planned enhancements to address current limitations:
 | Feature | Description | Status |
 |---------|-------------|--------|
 | HPA-aware comparison | Skip `spec.replicas` when HPA targets the deployment | ✅ Implemented |
-| Comprehensive unit tests | 213 tests with 80%+ coverage on core packages | ✅ Implemented |
+| Comprehensive unit tests | 241 tests with 80%+ coverage on core packages | ✅ Implemented |
 | CI/CD pipeline | GitHub Actions with `make ci`, pre-push hooks | ✅ Implemented |
-| Helm integration | `dorikin scan --helm ./chart` | 🚧 In Progress |
-| Kustomize integration | `dorikin scan --kustomize ./overlay` | 🚧 In Progress |
+| Helm integration | `dorikin scan --helm ./chart` with values and set flags | ✅ Implemented |
+| Kustomize integration | `dorikin scan --kustomize ./overlay` | ✅ Implemented |
 | Quantity normalization | Treat `128Mi` = `134217728` = `128M` | Planned |
 | Content-based array matching | Match array elements by key field (e.g., container name) | Planned |
 | Controller ownership | Use `managedFields` to skip controller-owned fields | Planned |

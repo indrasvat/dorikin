@@ -46,6 +46,8 @@ Dorikin compares your desired Kubernetes manifests against actual cluster state,
 - **Auto-refresh** — Continuously monitor for drift with configurable intervals
 - **Smart field filtering** — Ignores Kubernetes-managed fields (status, metadata.uid, etc.)
 - **HPA-aware** — Automatically skips replica comparison for HPA-managed resources
+- **Helm support** — Scan Helm charts directly with values and set overrides
+- **Kustomize support** — Scan Kustomize overlays directly
 - **Multi-format output** — Table, JSON, YAML, or quiet mode for CI/CD
 - **Recursive scanning** — Process entire manifest directories
 - **Context-aware** — Works with any kubeconfig context
@@ -89,6 +91,29 @@ dorikin scan -o json ./manifests/
 
 # Quiet mode (exit code only)
 dorikin scan -o quiet ./manifests/
+```
+
+### Helm Charts
+
+```bash
+# Scan a Helm chart
+dorikin scan --helm ./charts/myapp/
+
+# With custom release name and namespace
+dorikin scan --helm ./charts/myapp/ --helm-release production -n prod
+
+# With values files and --set overrides
+dorikin scan --helm ./charts/myapp/ --helm-values values-prod.yaml --helm-set image.tag=v1.2.3
+```
+
+### Kustomize Overlays
+
+```bash
+# Scan a Kustomize overlay
+dorikin scan --kustomize ./k8s/overlays/production/
+
+# With namespace filter
+dorikin scan --kustomize ./k8s/overlays/production/ -n my-namespace
 ```
 
 ### Interactive TUI
@@ -135,6 +160,11 @@ dorikin scan [flags] [paths...]
 | `--recursive` | `-R` | Recursively scan directories (default: true) |
 | `--ignore` | | Field paths to ignore during comparison |
 | `--hpa-aware` | | HPA awareness: `manifests` (default), `cluster`, `disabled` |
+| `--helm` | | Load manifests from Helm chart |
+| `--helm-release` | | Helm release name (default: `release`) |
+| `--helm-values` | | Helm values files (repeatable) |
+| `--helm-set` | | Helm --set values (repeatable) |
+| `--kustomize` | | Load manifests from Kustomize directory |
 
 ### UI Command
 
@@ -150,6 +180,11 @@ dorikin ui [flags] [paths...]
 | `--refresh-interval` | | Auto-refresh interval in seconds (default: 5) |
 | `--ignore` | | Field paths to ignore during comparison |
 | `--hpa-aware` | | HPA awareness: `manifests` (default), `cluster`, `disabled` |
+| `--helm` | | Load manifests from Helm chart |
+| `--helm-release` | | Helm release name (default: `release`) |
+| `--helm-values` | | Helm values files (repeatable) |
+| `--helm-set` | | Helm --set values (repeatable) |
+| `--kustomize` | | Load manifests from Kustomize directory |
 
 ## TUI Controls
 
@@ -186,7 +221,6 @@ Potential future enhancements:
 - **Webhook notifications** — Alert on drift via Slack, PagerDuty, or custom webhooks
 - **Prometheus metrics** — Expose drift metrics for monitoring dashboards
 - **Drift remediation** — Apply manifests to sync cluster state
-- **Helm/Kustomize support** — Native integration with templating tools
 - **Historical tracking** — Track drift over time with trend analysis
 - **Multi-cluster scanning** — Compare state across clusters
 - **Policy rules** — Define acceptable drift thresholds per resource type
