@@ -165,6 +165,8 @@ dorikin ui -c staging ./manifests/
 |------|-------|-------------|
 | `--kubeconfig` | `-k` | Path to kubeconfig file |
 | `--context` | `-c` | Kubernetes context to use |
+| `--debug` | | Enable debug logging to `~/.cache/dorikin/debug.log` |
+| `--log-file` | | Write logs to specified file (implies `--debug`) |
 
 ### Scan Command
 
@@ -208,6 +210,8 @@ dorikin ui [flags] [paths...]
 
 ## TUI Controls
 
+### List View
+
 | Key | Action |
 |-----|--------|
 | `↑` / `k` | Navigate up |
@@ -218,8 +222,18 @@ dorikin ui [flags] [paths...]
 | `o` | Toggle IN_SYNC visibility |
 | `r` | Manual refresh |
 | `a` | Toggle auto-refresh |
+| `L` | Open logs view |
 | `?` | Show help |
 | `q` | Quit |
+
+### Logs View
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Scroll through logs |
+| `f` | Cycle log level filter (all → info+ → warn+ → error) |
+| `c` | Clear logs |
+| `Esc` | Return to list view |
 
 ## Test Track
 

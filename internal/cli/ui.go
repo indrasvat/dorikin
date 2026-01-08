@@ -48,7 +48,7 @@ func init() {
 
 func runUI(cmd *cobra.Command, args []string) error {
 	// Initialize log capture system
-	capture, err := initLogCapture(cmd)
+	capture, err := initLogCaptureForTUI(cmd)
 	if err != nil {
 		return fmt.Errorf("initializing log capture: %w", err)
 	}
@@ -87,8 +87,8 @@ func runUI(cmd *cobra.Command, args []string) error {
 	return tui.RunWithCapture(result, scanFunc, interval, capture)
 }
 
-// initLogCapture creates and configures the log capture system based on CLI flags.
-func initLogCapture(cmd *cobra.Command) (*logcapture.Capture, error) {
+// initLogCaptureForTUI creates log capture for TUI (always captures stderr).
+func initLogCaptureForTUI(cmd *cobra.Command) (*logcapture.Capture, error) {
 	debug, _ := cmd.Flags().GetBool("debug")
 	logFile, _ := cmd.Flags().GetString("log-file")
 
@@ -104,4 +104,29 @@ func initLogCapture(cmd *cobra.Command) (*logcapture.Capture, error) {
 	}
 
 	return logcapture.New(opts), nil
+}
+
+// initLogCaptureForCLI creates log capture for CLI commands (only if logging enabled).
+// Returns nil if logging is not enabled.
+func initLogCaptureForCLI(cmd *cobra.Command) *logcapture.Capture {
+	debug, _ := cmd.Flags().GetBool("debug")
+	logFile, _ := cmd.Flags().GetString("log-file")
+
+	// Return nil if logging is not enabled
+	if !debug && logFile == "" {
+		return nil
+	}
+
+	opts := logcapture.Options{
+		Debug: true,
+	}
+
+	// Determine log file path
+	if logFile != "" {
+		opts.LogFile = logFile
+	} else {
+		opts.LogFile = logcapture.DefaultLogFile()
+	}
+
+	return logcapture.New(opts)
 }
