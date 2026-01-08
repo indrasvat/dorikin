@@ -1,0 +1,10 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken
+  namespace: default
+spec:
+  # invalid YAML - missing value
+  replicas:
+    - this should be a number not a list
+    indentation_broken
