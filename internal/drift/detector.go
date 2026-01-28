@@ -11,6 +11,7 @@ import (
 	"github.com/indrasvat/dorikin/internal/config"
 	"github.com/indrasvat/dorikin/internal/k8s"
 	"github.com/indrasvat/dorikin/internal/loader"
+	"github.com/indrasvat/dorikin/internal/logcapture"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
 
@@ -102,8 +103,10 @@ func (d *Detector) Scan(ctx context.Context, opts api.ScanOptions) (*api.ScanRes
 			if err == nil {
 				clusterIndex := ExtractHPATargetsFromUnstructured(clusterHPAs)
 				hpaIndex.Merge(clusterIndex)
+			} else {
+				// Log warning so users know cluster HPA discovery failed
+				logcapture.Warn("HPA cluster discovery failed, using manifest-only mode: %v", err)
 			}
-			// On error, continue with manifest-only HPAs (graceful degradation)
 		}
 	}
 
@@ -364,8 +367,9 @@ func (d *Detector) CurrentContext() string {
 }
 
 // detectExtraResources finds resources in the cluster that are not in manifests.
-// It queries the cluster for each unique GVK found in manifests and reports
-// any resources that don't have a corresponding manifest entry.
+// It queries the cluster concurrently for each unique GVK found in manifests
+// and reports any resources that don't have a corresponding manifest entry.
+// Errors listing specific resource types are logged but don't fail the scan.
 func (d *Detector) detectExtraResources(ctx context.Context, manifests []api.Resource, namespaces []string) []api.DriftReport {
 	// Build a set of manifest resource keys
 	manifestKeys := make(map[string]bool)
@@ -384,7 +388,8 @@ func (d *Detector) detectExtraResources(ctx context.Context, manifests []api.Res
 		wg.Go(func() {
 			clusterResources, err := d.client.ListResources(ctx, gvk, namespaces)
 			if err != nil {
-				// Skip on error - we can't list this resource type
+				// Log warning so users know EXTRA detection may be incomplete
+				logcapture.Warn("Failed to list %s resources for EXTRA detection: %v", gvk.Kind, err)
 				return
 			}
 
