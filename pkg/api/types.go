@@ -191,6 +191,8 @@ type ScanOptions struct {
 	// Namespace filters resources by namespace (empty = all).
 	//
 	// Deprecated: Use Namespaces for multi-namespace support.
+	// For backward compatibility, if Namespaces is empty and Namespace is set,
+	// Namespace is used as a single-element Namespaces slice.
 	Namespace string
 	// Namespaces filters resources by namespace(s) (empty = all).
 	Namespaces []string
