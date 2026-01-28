@@ -128,6 +128,11 @@ func BuildScanContext(cmd *cobra.Command, args []string, f *ScanFlags) (*ScanCon
 		return nil, err
 	}
 
+	// Validate no overlap between --kind and --exclude-kind
+	if err := validateKindFilters(f.Kinds, f.ExcludeKinds); err != nil {
+		return nil, err
+	}
+
 	// Build scan options
 	opts := api.ScanOptions{
 		ManifestPaths: paths,
@@ -158,6 +163,26 @@ func ParseHPAAwareMode(mode string) (api.HPAAwareMode, error) {
 	default:
 		return "", fmt.Errorf("invalid --hpa-aware mode: %q (valid: manifests, cluster, disabled)", mode)
 	}
+}
+
+// validateKindFilters checks that --kind and --exclude-kind don't overlap.
+func validateKindFilters(include, exclude []string) error {
+	if len(include) == 0 || len(exclude) == 0 {
+		return nil
+	}
+
+	excludeSet := make(map[string]bool, len(exclude))
+	for _, k := range exclude {
+		excludeSet[k] = true
+	}
+
+	for _, k := range include {
+		if excludeSet[k] {
+			return fmt.Errorf("kind %q appears in both --kind and --exclude-kind", k)
+		}
+	}
+
+	return nil
 }
 
 // BuildLoader creates the appropriate loader based on flags.
