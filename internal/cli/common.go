@@ -14,11 +14,14 @@ import (
 
 // ScanFlags holds the common flags shared between scan and ui commands.
 type ScanFlags struct {
-	Manifests []string
-	Namespace string
-	Recursive bool
-	Ignore    []string
-	HPAAware  string
+	Manifests    []string
+	Namespaces   []string
+	Kinds        []string
+	ExcludeKinds []string
+	Recursive    bool
+	Ignore       []string
+	HPAAware     string
+	IncludeExtra bool
 
 	// Helm flags
 	Helm        bool
@@ -33,10 +36,13 @@ type ScanFlags struct {
 // RegisterScanFlags registers the common scan flags on a cobra command.
 func RegisterScanFlags(cmd *cobra.Command, f *ScanFlags) {
 	cmd.Flags().StringArrayVarP(&f.Manifests, "file", "f", nil, "manifest file or directory (can be repeated)")
-	cmd.Flags().StringVarP(&f.Namespace, "namespace", "n", "", "filter by namespace")
+	cmd.Flags().StringSliceVarP(&f.Namespaces, "namespace", "n", nil, "filter by namespace(s) (repeatable or comma-separated)")
+	cmd.Flags().StringSliceVar(&f.Kinds, "kind", nil, "include only these Kinds (can be repeated)")
+	cmd.Flags().StringSliceVar(&f.ExcludeKinds, "exclude-kind", nil, "exclude these Kinds (can be repeated)")
 	cmd.Flags().BoolVarP(&f.Recursive, "recursive", "R", true, "recursively scan directories")
 	cmd.Flags().StringSliceVar(&f.Ignore, "ignore", nil, "field paths to ignore (overrides config file)")
 	cmd.Flags().StringVar(&f.HPAAware, "hpa-aware", "", "HPA awareness mode: manifests (default), cluster, disabled")
+	cmd.Flags().BoolVar(&f.IncludeExtra, "include-extra", false, "detect cluster resources not in manifests")
 
 	// Helm flags
 	cmd.Flags().BoolVar(&f.Helm, "helm", false, "load manifests from Helm chart (run helm template)")
@@ -57,18 +63,24 @@ type ScanContext struct {
 
 // BuildScanContext creates a ScanContext from flags and command args.
 func BuildScanContext(cmd *cobra.Command, args []string, f *ScanFlags) (*ScanContext, error) {
-	// Combine -f flags and positional args
-	paths := make([]string, 0, len(f.Manifests)+len(args))
-	paths = append(paths, f.Manifests...)
-	paths = append(paths, args...)
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("at least one manifest path required (use -f or positional args)")
-	}
-
 	// Load configuration from .dorikin.yaml (if present)
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Combine -f flags and positional args
+	paths := make([]string, 0, len(f.Manifests)+len(args))
+	paths = append(paths, f.Manifests...)
+	paths = append(paths, args...)
+
+	// Fall back to config paths if no CLI paths provided
+	if len(paths) == 0 {
+		paths = cfg.EffectivePaths()
+	}
+
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no manifest paths (use -f, positional args, or paths in .dorikin.yaml)")
 	}
 
 	// Determine effective ignore paths: CLI flag overrides config
@@ -97,7 +109,12 @@ func BuildScanContext(cmd *cobra.Command, args []string, f *ScanFlags) (*ScanCon
 	}
 
 	// Select loader based on flags
-	ldr, err := BuildLoader(f.Helm, f.Kustomize, f.HelmRelease, f.Namespace, f.HelmValues, f.HelmSet)
+	// For Helm, use first namespace if specified (Helm templates typically target one namespace)
+	helmNamespace := ""
+	if len(f.Namespaces) > 0 {
+		helmNamespace = f.Namespaces[0]
+	}
+	ldr, err := BuildLoader(f.Helm, f.Kustomize, f.HelmRelease, helmNamespace, f.HelmValues, f.HelmSet)
 	if err != nil {
 		return nil, err
 	}
@@ -111,12 +128,20 @@ func BuildScanContext(cmd *cobra.Command, args []string, f *ScanFlags) (*ScanCon
 		return nil, err
 	}
 
+	// Validate no overlap between --kind and --exclude-kind
+	if err := validateKindFilters(f.Kinds, f.ExcludeKinds); err != nil {
+		return nil, err
+	}
+
 	// Build scan options
 	opts := api.ScanOptions{
 		ManifestPaths: paths,
-		Namespace:     f.Namespace,
+		Namespaces:    f.Namespaces,
+		Kinds:         f.Kinds,
+		ExcludeKinds:  f.ExcludeKinds,
 		Recursive:     f.Recursive,
 		HPAAware:      hpaMode,
+		IncludeExtra:  f.IncludeExtra,
 	}
 
 	return &ScanContext{
@@ -138,6 +163,26 @@ func ParseHPAAwareMode(mode string) (api.HPAAwareMode, error) {
 	default:
 		return "", fmt.Errorf("invalid --hpa-aware mode: %q (valid: manifests, cluster, disabled)", mode)
 	}
+}
+
+// validateKindFilters checks that --kind and --exclude-kind don't overlap.
+func validateKindFilters(include, exclude []string) error {
+	if len(include) == 0 || len(exclude) == 0 {
+		return nil
+	}
+
+	excludeSet := make(map[string]bool, len(exclude))
+	for _, k := range exclude {
+		excludeSet[k] = true
+	}
+
+	for _, k := range include {
+		if excludeSet[k] {
+			return fmt.Errorf("kind %q appears in both --kind and --exclude-kind", k)
+		}
+	}
+
+	return nil
 }
 
 // BuildLoader creates the appropriate loader based on flags.

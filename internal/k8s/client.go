@@ -17,6 +17,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/indrasvat/dorikin/internal/logcapture"
 )
 
 // Client wraps Kubernetes client functionality.
@@ -169,8 +171,54 @@ func (c *Client) CurrentContext() string {
 	return c.context
 }
 
+// ListResources lists all resources of a given GVK in the specified namespaces.
+// If namespaces is empty, lists resources in all namespaces.
+// For cluster-scoped resources, the namespace filter is ignored (lists once without namespace).
+// When listing by namespace, errors for individual namespaces are logged but skipped
+// (e.g., if a namespace does not exist or access is denied).
+func (c *Client) ListResources(ctx context.Context, gvk schema.GroupVersionKind, namespaces []string) ([]*unstructured.Unstructured, error) {
+	mapping, err := c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return nil, fmt.Errorf("mapping GVK to GVR: %w", err)
+	}
+	gvr := mapping.Resource
+
+	var allResources []*unstructured.Unstructured
+
+	// Check if resource is cluster-scoped (not namespaced)
+	isClusterScoped := mapping.Scope.Name() == meta.RESTScopeNameRoot
+
+	// If no namespaces specified OR resource is cluster-scoped, list without namespace filter
+	if len(namespaces) == 0 || isClusterScoped {
+		result, err := c.dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("listing resources: %w", err)
+		}
+		for i := range result.Items {
+			allResources = append(allResources, &result.Items[i])
+		}
+		return allResources, nil
+	}
+
+	// List namespaced resources in each namespace
+	for _, ns := range namespaces {
+		result, err := c.dynamic.Resource(gvr).Namespace(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			// Log but don't fail - partial results are better than no results
+			logcapture.Warn("Failed to list %s in namespace %s: %v", gvr.Resource, ns, err)
+			continue
+		}
+		for i := range result.Items {
+			allResources = append(allResources, &result.Items[i])
+		}
+	}
+
+	return allResources, nil
+}
+
 // ListHPAs lists all HPAs in the specified namespaces.
 // If namespaces is empty, lists HPAs in all namespaces.
+// When listing by namespace, errors for individual namespaces are logged but skipped.
 func (c *Client) ListHPAs(ctx context.Context, namespaces []string) ([]*unstructured.Unstructured, error) {
 	// Try autoscaling/v2 first (preferred), fall back to v1
 	gvr := schema.GroupVersionResource{
@@ -206,7 +254,8 @@ func (c *Client) ListHPAs(ctx context.Context, namespaces []string) ([]*unstruct
 			gvr.Version = "v1"
 			result, err = c.dynamic.Resource(gvr).Namespace(ns).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				// Skip this namespace if HPA listing fails
+				// Log but don't fail - partial HPA discovery is better than none
+				logcapture.Warn("Failed to list HPAs in namespace %s: %v", ns, err)
 				continue
 			}
 		}

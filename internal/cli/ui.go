@@ -74,20 +74,14 @@ func runUI(cmd *cobra.Command, args []string) error {
 		return ctx.Detector.Scan(cmd.Context(), ctx.Options)
 	}
 
-	// Run initial scan
-	logcapture.Info("Running initial scan")
-	result, err := scanFunc()
-	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
-	}
-	logcapture.Info("Initial scan complete: %d resources", len(result.Reports))
-
 	// Get current kubectl context for display
 	kubeContext := ctx.Detector.CurrentContext()
 
-	// Launch TUI with refresh capability and configurable interval
+	// Launch TUI immediately with async initial scan (no blocking!)
+	// The TUI will show a loading state and update when scan completes.
 	interval := time.Duration(uiRefreshInterval) * time.Second
-	return tui.RunWithCapture(result, scanFunc, interval, capture, kubeContext)
+	logcapture.Info("Launching TUI (scan will run async)")
+	return tui.RunWithCaptureAsync(scanFunc, interval, capture, kubeContext)
 }
 
 // initLogCaptureForTUI creates log capture for TUI (always captures stderr).

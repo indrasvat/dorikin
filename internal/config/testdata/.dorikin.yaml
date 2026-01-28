@@ -1,0 +1,7 @@
+paths:
+  - ./manifests/
+  - ./k8s/
+
+ignore:
+  paths:
+    - metadata.labels.app.kubernetes.io/managed-by

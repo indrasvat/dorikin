@@ -9,20 +9,23 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
+	"github.com/indrasvat/dorikin/internal/logcapture"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
 
 // HelmLoader loads manifests by running helm template.
 type HelmLoader struct {
-	helmPath    string   // path to helm binary (auto-detected if empty)
-	releaseName string   // release name for helm template
-	namespace   string   // namespace for helm template
-	values      []string // -f value files
-	setValues   []string // --set key=value
+	helmPath    string        // path to helm binary (auto-detected if empty)
+	releaseName string        // release name for helm template
+	namespace   string        // namespace for helm template
+	values      []string      // -f value files
+	setValues   []string      // --set key=value
+	timeout     time.Duration // timeout for helm commands (default: 60s)
 }
 
 // HelmOption is a functional option for configuring HelmLoader.
@@ -63,10 +66,19 @@ func WithSet(setValues []string) HelmOption {
 	}
 }
 
+// WithTimeout sets the timeout for helm commands.
+// Default is 60 seconds.
+func WithTimeout(d time.Duration) HelmOption {
+	return func(h *HelmLoader) {
+		h.timeout = d
+	}
+}
+
 // NewHelmLoader creates a new HelmLoader.
 func NewHelmLoader(opts ...HelmOption) *HelmLoader {
 	h := &HelmLoader{
-		releaseName: "release", // default release name
+		releaseName: "release",        // default release name
+		timeout:     60 * time.Second, // default timeout
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -136,14 +148,24 @@ func (h *HelmLoader) loadChart(ctx context.Context, helmBin, chartPath string) (
 		args = append(args, "--set", s)
 	}
 
+	// Wrap context with timeout to prevent indefinite hangs
+	timeoutCtx, cancel := context.WithTimeout(ctx, h.timeout)
+	defer cancel()
+
 	// Run helm template
 	// #nosec G204 -- helmBin is validated to exist, args are user-provided chart options
-	cmd := exec.CommandContext(ctx, helmBin, args...)
+	cmd := exec.CommandContext(timeoutCtx, helmBin, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		switch timeoutCtx.Err() {
+		case context.DeadlineExceeded:
+			return nil, fmt.Errorf("helm template timed out after %v", h.timeout)
+		case context.Canceled:
+			return nil, fmt.Errorf("helm template canceled")
+		}
 		return nil, fmt.Errorf("helm template failed: %w\n%s", err, stderr.String())
 	}
 
@@ -207,6 +229,8 @@ func (h *HelmLoader) parseYAML(ctx context.Context, r *bytes.Buffer, sourcePath 
 }
 
 // parseDocument parses a single YAML document.
+// Returns nil for empty documents, documents without a Kind, or parse errors.
+// Parse errors are logged so users know manifests are being skipped.
 func (h *HelmLoader) parseDocument(data []byte, sourcePath string) *api.Resource {
 	// Skip empty documents
 	if len(bytes.TrimSpace(data)) == 0 {
@@ -216,6 +240,7 @@ func (h *HelmLoader) parseDocument(data []byte, sourcePath string) *api.Resource
 	// Parse into unstructured
 	obj := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal(data, &obj.Object); err != nil {
+		logcapture.Warn("Failed to parse YAML document in %s: %v", sourcePath, err)
 		return nil
 	}
 

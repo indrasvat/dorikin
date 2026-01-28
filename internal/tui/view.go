@@ -21,6 +21,16 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
+	// Show loading state while initial scan is running
+	if m.refreshing && len(m.reports) == 0 {
+		return m.renderLoading()
+	}
+
+	// Show error state if initial scan failed
+	if m.scanError != nil && len(m.reports) == 0 {
+		return m.renderError()
+	}
+
 	var content string
 	switch m.viewMode {
 	case ViewHelp:
@@ -39,6 +49,126 @@ func (m Model) View() string {
 			m.renderHeader(),
 			content,
 			m.renderFooter(),
+		),
+	)
+}
+
+// renderLoading renders a loading screen while initial scan is running.
+func (m Model) renderLoading() string {
+	// ASCII art banner in Tsuchiya Jade (TokyoNeon)
+	banner := m.styles.InSync.Render(`
+  ██████╗  ██████╗ ██████╗ ██╗██╗  ██╗██╗███╗   ██╗
+  ██╔══██╗██╔═══██╗██╔══██╗██║██║ ██╔╝██║████╗  ██║
+  ██║  ██║██║   ██║██████╔╝██║█████╔╝ ██║██╔██╗ ██║
+  ██║  ██║██║   ██║██╔══██╗██║██╔═██╗ ██║██║╚██╗██║
+  ██████╔╝╚██████╔╝██║  ██║██║██║  ██╗██║██║ ╚████║
+  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝`)
+
+	// Subtitle with cluster context
+	var subtitle string
+	if m.kubeContext != "" {
+		subtitle = m.styles.Subtle.Render("  🏎️  AE86 TEST TRACK") +
+			m.styles.ClusterContext.Render(" ☸ "+m.kubeContext+" ")
+	} else {
+		subtitle = m.styles.Subtle.Render("  🏎️  Kubernetes Configuration Drift Detector")
+	}
+
+	// Animated spinner frames (braille dots pattern)
+	spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	spinner := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
+
+	// Loading indicator with animated spinner
+	loadingText := m.styles.Drifted.Render("  " + spinner + " Scanning cluster for drift...")
+	hint := m.styles.Subtle.Render("  Fetching resources from Kubernetes API")
+
+	// Build content box
+	contentBox := lipgloss.JoinVertical(
+		lipgloss.Left,
+		banner,
+		"",
+		subtitle,
+		"",
+		"",
+		loadingText,
+		hint,
+	)
+
+	// Center the content
+	centeredContent := lipgloss.Place(
+		m.width-4,
+		m.height-4,
+		lipgloss.Center,
+		lipgloss.Center,
+		contentBox,
+	)
+
+	// Footer with minimal hints
+	footer := m.styles.Footer.Width(m.width - 4).Render(
+		m.styles.HelpKey.Render("q") + m.styles.HelpDesc.Render(" quit"),
+	)
+
+	return m.styles.Container.Render(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			centeredContent,
+			footer,
+		),
+	)
+}
+
+// renderError renders an error screen when the scan fails.
+func (m Model) renderError() string {
+	// ASCII art banner in red
+	banner := m.styles.Error.Render(`
+  ██████╗  ██████╗ ██████╗ ██╗██╗  ██╗██╗███╗   ██╗
+  ██╔══██╗██╔═══██╗██╔══██╗██║██║ ██╔╝██║████╗  ██║
+  ██║  ██║██║   ██║██████╔╝██║█████╔╝ ██║██╔██╗ ██║
+  ██║  ██║██║   ██║██╔══██╗██║██╔═██╗ ██║██║╚██╗██║
+  ██████╔╝╚██████╔╝██║  ██║██║██║  ██╗██║██║ ╚████║
+  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝`)
+
+	// Error title
+	errorTitle := m.styles.Error.Render("  💥 SCAN FAILED")
+
+	// Error message
+	errorMsg := m.styles.Subtle.Render(fmt.Sprintf("  %v", m.scanError))
+
+	// Hint
+	hint := m.styles.Subtle.Render("  Press 'L' to view logs for more details, 'r' to retry, or 'q' to quit")
+
+	// Build content box
+	contentBox := lipgloss.JoinVertical(
+		lipgloss.Left,
+		banner,
+		"",
+		errorTitle,
+		"",
+		errorMsg,
+		"",
+		hint,
+	)
+
+	// Center the content
+	centeredContent := lipgloss.Place(
+		m.width-4,
+		m.height-4,
+		lipgloss.Center,
+		lipgloss.Center,
+		contentBox,
+	)
+
+	// Footer with hints
+	footer := m.styles.Footer.Width(m.width - 4).Render(
+		m.styles.HelpKey.Render("L") + m.styles.HelpDesc.Render(" logs") + "  " +
+			m.styles.HelpKey.Render("r") + m.styles.HelpDesc.Render(" retry") + "  " +
+			m.styles.HelpKey.Render("q") + m.styles.HelpDesc.Render(" quit"),
+	)
+
+	return m.styles.Container.Render(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			centeredContent,
+			footer,
 		),
 	)
 }
@@ -232,11 +362,13 @@ func (m Model) renderDetail() string {
 		return "No resource selected"
 	}
 
-	sections := []string{
+	// Preallocate with capacity 4: header, tabs, content, lap indicator
+	sections := make([]string, 0, 4)
+	sections = append(sections,
 		m.renderDetailHeader(report),
 		m.renderDetailTabs(),
 		m.renderDetailContent(report),
-	}
+	)
 
 	// Lap indicator (racing theme!)
 	lapIndicator := m.styles.Subtle.Render(fmt.Sprintf(

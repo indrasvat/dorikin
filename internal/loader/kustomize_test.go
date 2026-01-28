@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"testing"
+	"time"
 )
 
 func kustomizeAvailable() bool {
@@ -233,5 +234,19 @@ func TestKustomizeLoader_ValidateDir_NotDirectory(t *testing.T) {
 	err := l.validateKustomizationDir("testdata/kustomize/valid/kustomization.yaml")
 	if err == nil {
 		t.Error("validateKustomizationDir() should return error for non-directory path")
+	}
+}
+
+func TestKustomizeLoader_WithTimeout(t *testing.T) {
+	l := NewKustomizeLoader(WithKustomizeTimeout(30 * time.Second))
+	if l.timeout != 30*time.Second {
+		t.Errorf("timeout = %v, want %v", l.timeout, 30*time.Second)
+	}
+}
+
+func TestKustomizeLoader_DefaultTimeout(t *testing.T) {
+	l := NewKustomizeLoader()
+	if l.timeout != 60*time.Second {
+		t.Errorf("default timeout = %v, want %v", l.timeout, 60*time.Second)
 	}
 }

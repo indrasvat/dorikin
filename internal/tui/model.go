@@ -48,6 +48,7 @@ type Model struct {
 	refreshing      bool
 	autoRefresh     bool
 	refreshInterval time.Duration
+	scanError       error // Last scan error (if any)
 
 	// UI state
 	cursor   int
@@ -69,6 +70,9 @@ type Model struct {
 	logsCursor int
 	logsFilter logcapture.Level
 
+	// Spinner animation
+	spinnerFrame int
+
 	// Components
 	help   help.Model
 	keys   keyMap
@@ -83,6 +87,9 @@ type RefreshMsg struct {
 
 // TickMsg is sent on each auto-refresh interval.
 type TickMsg time.Time
+
+// SpinnerTickMsg is sent for spinner animation during loading.
+type SpinnerTickMsg time.Time
 
 // keyMap defines keyboard shortcuts.
 type keyMap struct {
@@ -207,6 +214,10 @@ func NewModelWithInterval(result *api.ScanResult, scanFunc ScanFunc, interval ti
 
 // Init initializes the model.
 func (m Model) Init() tea.Cmd {
+	// If we're in loading state (async mode), trigger the initial scan and spinner
+	if m.refreshing && m.scanFunc != nil {
+		return tea.Batch(m.doRefresh(), spinnerTickCmd())
+	}
 	return nil
 }
 
@@ -284,6 +295,13 @@ func (m *Model) tickCmd() tea.Cmd {
 	})
 }
 
+// spinnerTickCmd returns a command that sends a SpinnerTickMsg for animation.
+func spinnerTickCmd() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return SpinnerTickMsg(t)
+	})
+}
+
 // updateFromResult updates the model with new scan results.
 func (m *Model) updateFromResult(result *api.ScanResult) {
 	m.result = result
@@ -297,5 +315,35 @@ func NewModelWithCapture(result *api.ScanResult, scanFunc ScanFunc, interval tim
 	m.logCapture = capture
 	m.logsFilter = logcapture.LevelDebug // Show all levels by default
 	m.kubeContext = kubeContext
+	return m
+}
+
+// NewModelAsync creates a new TUI model that launches immediately and scans asynchronously.
+// The TUI shows a loading state until the initial scan completes.
+func NewModelAsync(scanFunc ScanFunc, interval time.Duration, capture *logcapture.Capture, kubeContext string) Model {
+	// Create empty result for immediate display
+	emptyResult := &api.ScanResult{
+		Reports:   []api.DriftReport{},
+		Summary:   api.ScanSummary{},
+		StartedAt: time.Now(),
+	}
+
+	m := Model{
+		result:          emptyResult,
+		reports:         emptyResult.Reports,
+		scanFunc:        scanFunc,
+		refreshInterval: interval,
+		refreshing:      true, // Start in loading state
+		viewMode:        ViewList,
+		showAll:         false,
+		help:            help.New(),
+		keys:            defaultKeyMap(),
+		styles:          styles.New(),
+		logCapture:      capture,
+		logsFilter:      logcapture.LevelDebug,
+		kubeContext:     kubeContext,
+	}
+
+	m.applyFilter()
 	return m
 }

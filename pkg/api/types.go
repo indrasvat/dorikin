@@ -189,7 +189,17 @@ type ScanOptions struct {
 	// ManifestPaths are paths to manifest files or directories.
 	ManifestPaths []string
 	// Namespace filters resources by namespace (empty = all).
+	//
+	// Deprecated: Use Namespaces for multi-namespace support.
+	// For backward compatibility, if Namespaces is empty and Namespace is set,
+	// Namespace is used as a single-element Namespaces slice.
 	Namespace string
+	// Namespaces filters resources by namespace(s) (empty = all).
+	Namespaces []string
+	// Kinds filters to include only these resource kinds.
+	Kinds []string
+	// ExcludeKinds filters to exclude these resource kinds.
+	ExcludeKinds []string
 	// KubeContext is the kubectl context to use.
 	KubeContext string
 	// KubeConfig is the path to kubeconfig file.
