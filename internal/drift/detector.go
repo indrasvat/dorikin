@@ -2,8 +2,11 @@ package drift
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/indrasvat/dorikin/internal/config"
 	"github.com/indrasvat/dorikin/internal/k8s"
@@ -106,6 +109,12 @@ func (d *Detector) Scan(ctx context.Context, opts api.ScanOptions) (*api.ScanRes
 
 	// Detect drift for all resources
 	reports := d.detectDrift(ctx, resources, hpaIndex)
+
+	// Detect extra resources if requested
+	if opts.IncludeExtra {
+		extraReports := d.detectExtraResources(ctx, resources, namespaces)
+		reports = append(reports, extraReports...)
+	}
 
 	// Calculate summary
 	summary := calculateSummary(reports)
@@ -352,4 +361,79 @@ func deepCopyValue(v any) any {
 // CurrentContext returns the current kubectl context name.
 func (d *Detector) CurrentContext() string {
 	return d.client.CurrentContext()
+}
+
+// detectExtraResources finds resources in the cluster that are not in manifests.
+// It queries the cluster for each unique GVK found in manifests and reports
+// any resources that don't have a corresponding manifest entry.
+func (d *Detector) detectExtraResources(ctx context.Context, manifests []api.Resource, namespaces []string) []api.DriftReport {
+	// Build a set of manifest resource keys
+	manifestKeys := make(map[string]bool)
+	for _, r := range manifests {
+		manifestKeys[resourceKey(r.Ref())] = true
+	}
+
+	// Extract unique GVKs from manifests
+	gvks := extractUniqueGVKs(manifests)
+
+	var reports []api.DriftReport
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, gvk := range gvks {
+		wg.Go(func() {
+			clusterResources, err := d.client.ListResources(ctx, gvk, namespaces)
+			if err != nil {
+				// Skip on error - we can't list this resource type
+				return
+			}
+
+			for _, cr := range clusterResources {
+				ref := api.ResourceRef{
+					APIVersion: cr.GetAPIVersion(),
+					Kind:       cr.GetKind(),
+					Namespace:  cr.GetNamespace(),
+					Name:       cr.GetName(),
+				}
+
+				// If this resource is not in manifests, it's EXTRA
+				if !manifestKeys[resourceKey(ref)] {
+					report := api.DriftReport{
+						Resource:      ref,
+						Status:        api.StatusExtra,
+						ClusterObject: deepCopyMap(cr.Object),
+						CheckedAt:     time.Now(),
+					}
+
+					mu.Lock()
+					reports = append(reports, report)
+					mu.Unlock()
+				}
+			}
+		})
+	}
+
+	wg.Wait()
+	return reports
+}
+
+// resourceKey generates a unique key for a resource reference.
+func resourceKey(ref api.ResourceRef) string {
+	return fmt.Sprintf("%s/%s/%s/%s", ref.APIVersion, ref.Kind, ref.Namespace, ref.Name)
+}
+
+// extractUniqueGVKs returns the unique GroupVersionKinds from a list of resources.
+func extractUniqueGVKs(resources []api.Resource) []schema.GroupVersionKind {
+	seen := make(map[schema.GroupVersionKind]bool)
+	var gvks []schema.GroupVersionKind
+
+	for _, r := range resources {
+		gvk := r.Object.GroupVersionKind()
+		if !seen[gvk] {
+			seen[gvk] = true
+			gvks = append(gvks, gvk)
+		}
+	}
+
+	return gvks
 }

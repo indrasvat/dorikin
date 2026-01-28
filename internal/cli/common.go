@@ -21,6 +21,7 @@ type ScanFlags struct {
 	Recursive    bool
 	Ignore       []string
 	HPAAware     string
+	IncludeExtra bool
 
 	// Helm flags
 	Helm        bool
@@ -41,6 +42,7 @@ func RegisterScanFlags(cmd *cobra.Command, f *ScanFlags) {
 	cmd.Flags().BoolVarP(&f.Recursive, "recursive", "R", true, "recursively scan directories")
 	cmd.Flags().StringSliceVar(&f.Ignore, "ignore", nil, "field paths to ignore (overrides config file)")
 	cmd.Flags().StringVar(&f.HPAAware, "hpa-aware", "", "HPA awareness mode: manifests (default), cluster, disabled")
+	cmd.Flags().BoolVar(&f.IncludeExtra, "include-extra", false, "detect cluster resources not in manifests")
 
 	// Helm flags
 	cmd.Flags().BoolVar(&f.Helm, "helm", false, "load manifests from Helm chart (run helm template)")
@@ -134,6 +136,7 @@ func BuildScanContext(cmd *cobra.Command, args []string, f *ScanFlags) (*ScanCon
 		ExcludeKinds:  f.ExcludeKinds,
 		Recursive:     f.Recursive,
 		HPAAware:      hpaMode,
+		IncludeExtra:  f.IncludeExtra,
 	}
 
 	return &ScanContext{
