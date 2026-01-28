@@ -89,9 +89,13 @@ Enter
 Sleep 1s
 
 # We start in RIGHT pane (pane 1) - launch TUI
+# TUI now launches INSTANTLY with "Scanning cluster..." loading screen
 Type "./bin/dorikin ui --refresh-interval 1 ./testdata/track-manifests"
 Enter
-Sleep 3s
+# Brief pause to show the instant loading screen before scan completes
+Sleep 500ms
+# Wait for scan to complete and full interface to appear
+Sleep 2500ms
 
 # Enable auto-refresh
 Type "a"

@@ -22,32 +22,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case RefreshMsg:
-		m.refreshing = false
-		if msg.Err != nil {
-			logcapture.Error("Refresh failed: %v", msg.Err)
-		} else if msg.Result != nil {
-			m.updateFromResult(msg.Result)
-			// Log summary of results with appropriate level
-			s := msg.Result.Summary
-			switch {
-			case s.Errors > 0:
-				// Use ERROR for actual errors (connection failures, API errors)
-				logcapture.Error("Scan complete: %d drifted, %d missing, %d extra, %d errors",
-					s.Drifted, s.Missing, s.Extra, s.Errors)
-			case s.HasIssues():
-				// Use WARN for drift issues (missing, extra, drifted)
-				logcapture.Warn("Scan complete: %d drifted, %d missing, %d extra",
-					s.Drifted, s.Missing, s.Extra)
-			default:
-				logcapture.Info("Scan complete: %d resources in sync", s.InSync)
-			}
-		}
-		// Continue auto-refresh cycle if enabled
-		if m.autoRefresh {
-			cmd := m.tickCmd()
-			return m, cmd
-		}
-		return m, nil
+		return m.handleRefreshMsg(msg)
 
 	case TickMsg:
 		// Auto-refresh tick - trigger a scan if not already refreshing
@@ -153,6 +128,37 @@ func (m Model) handleAutoRefresh() (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+// handleRefreshMsg handles refresh completion messages.
+func (m Model) handleRefreshMsg(msg RefreshMsg) (tea.Model, tea.Cmd) {
+	m.refreshing = false
+	if msg.Err != nil {
+		logcapture.Error("Refresh failed: %v", msg.Err)
+	} else if msg.Result != nil {
+		m.updateFromResult(msg.Result)
+		m.logScanSummary(msg.Result.Summary)
+	}
+	// Continue auto-refresh cycle if enabled
+	if m.autoRefresh {
+		cmd := m.tickCmd()
+		return m, cmd
+	}
+	return m, nil
+}
+
+// logScanSummary logs the scan summary at the appropriate level.
+func (m Model) logScanSummary(s api.ScanSummary) {
+	switch {
+	case s.Errors > 0:
+		logcapture.Error("Scan complete: %d drifted, %d missing, %d extra, %d errors",
+			s.Drifted, s.Missing, s.Extra, s.Errors)
+	case s.HasIssues():
+		logcapture.Warn("Scan complete: %d drifted, %d missing, %d extra",
+			s.Drifted, s.Missing, s.Extra)
+	default:
+		logcapture.Info("Scan complete: %d resources in sync", s.InSync)
+	}
 }
 
 // handleDetailKeys handles keys in detail view.
