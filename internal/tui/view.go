@@ -21,6 +21,11 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
+	// Show loading state while initial scan is running
+	if m.refreshing && len(m.reports) == 0 {
+		return m.renderLoading()
+	}
+
 	var content string
 	switch m.viewMode {
 	case ViewHelp:
@@ -39,6 +44,63 @@ func (m Model) View() string {
 			m.renderHeader(),
 			content,
 			m.renderFooter(),
+		),
+	)
+}
+
+// renderLoading renders a loading screen while initial scan is running.
+func (m Model) renderLoading() string {
+	// Build a loading screen consistent with dorikin AE86 theme
+	title := m.styles.Title.Render(" 🏎️  dorikin ")
+
+	// Cluster context indicator
+	var clusterInfo string
+	if m.kubeContext != "" {
+		clusterInfo = m.styles.ClusterContext.Render(" ☸ " + m.kubeContext + " ")
+	}
+
+	// Header line
+	header := m.styles.Header.Width(m.width - 4).Render(
+		lipgloss.JoinHorizontal(
+			lipgloss.Center,
+			title,
+			clusterInfo,
+		),
+	)
+
+	// Racing-themed loading message
+	// Using DriftYellow (activity indicator) for spinner
+	loadingBox := lipgloss.NewStyle().
+		Padding(2, 4).
+		Render(
+			lipgloss.JoinVertical(
+				lipgloss.Center,
+				m.styles.Drifted.Render("⟳ Scanning cluster..."),
+				"",
+				m.styles.Subtle.Render("Fetching resources from Kubernetes API"),
+			),
+		)
+
+	// Center the loading box
+	centeredLoading := lipgloss.Place(
+		m.width-4,
+		m.height-8,
+		lipgloss.Center,
+		lipgloss.Center,
+		loadingBox,
+	)
+
+	// Footer with minimal hints
+	footer := m.styles.Footer.Width(m.width - 4).Render(
+		m.styles.HelpKey.Render("q") + m.styles.HelpDesc.Render(" quit"),
+	)
+
+	return m.styles.Container.Render(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			header,
+			centeredLoading,
+			footer,
 		),
 	)
 }

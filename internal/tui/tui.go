@@ -51,3 +51,21 @@ func RunWithCapture(result *api.ScanResult, scanFunc ScanFunc, interval time.Dur
 
 	return nil
 }
+
+// RunWithCaptureAsync starts the TUI immediately and runs the initial scan asynchronously.
+// This provides instant TUI launch with a loading state while data is fetched.
+func RunWithCaptureAsync(scanFunc ScanFunc, interval time.Duration, capture *logcapture.Capture, kubeContext string) error {
+	model := NewModelAsync(scanFunc, interval, capture, kubeContext)
+
+	p := tea.NewProgram(
+		model,
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
+	)
+
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("error running TUI: %w", err)
+	}
+
+	return nil
+}

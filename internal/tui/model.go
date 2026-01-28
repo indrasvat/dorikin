@@ -207,6 +207,10 @@ func NewModelWithInterval(result *api.ScanResult, scanFunc ScanFunc, interval ti
 
 // Init initializes the model.
 func (m Model) Init() tea.Cmd {
+	// If we're in loading state (async mode), trigger the initial scan
+	if m.refreshing && m.scanFunc != nil {
+		return m.doRefresh()
+	}
 	return nil
 }
 
@@ -297,5 +301,34 @@ func NewModelWithCapture(result *api.ScanResult, scanFunc ScanFunc, interval tim
 	m.logCapture = capture
 	m.logsFilter = logcapture.LevelDebug // Show all levels by default
 	m.kubeContext = kubeContext
+	return m
+}
+
+// NewModelAsync creates a new TUI model that launches immediately and scans asynchronously.
+// The TUI shows a loading state until the initial scan completes.
+func NewModelAsync(scanFunc ScanFunc, interval time.Duration, capture *logcapture.Capture, kubeContext string) Model {
+	// Create empty result for immediate display
+	emptyResult := &api.ScanResult{
+		Reports:   []api.DriftReport{},
+		Summary:   api.ScanSummary{},
+		StartedAt: time.Now(),
+	}
+
+	m := Model{
+		result:          emptyResult,
+		reports:         emptyResult.Reports,
+		scanFunc:        scanFunc,
+		refreshInterval: interval,
+		refreshing:      true, // Start in loading state
+		viewMode:        ViewList,
+		showAll:         false,
+		help:            help.New(),
+		keys:            defaultKeyMap(),
+		styles:          styles.New(),
+		logCapture:      capture,
+		logsFilter:      logcapture.LevelDebug,
+		kubeContext:     kubeContext,
+	}
+
 	return m
 }
