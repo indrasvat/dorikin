@@ -58,6 +58,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m, nil
+
+	case SpinnerTickMsg:
+		// Spinner animation tick - continue while loading
+		if m.refreshing && len(m.reports) == 0 {
+			m.spinnerFrame = (m.spinnerFrame + 1) % 10
+			return m, spinnerTickCmd()
+		}
+		return m, nil
 	}
 
 	return m, nil

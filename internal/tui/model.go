@@ -69,6 +69,9 @@ type Model struct {
 	logsCursor int
 	logsFilter logcapture.Level
 
+	// Spinner animation
+	spinnerFrame int
+
 	// Components
 	help   help.Model
 	keys   keyMap
@@ -83,6 +86,9 @@ type RefreshMsg struct {
 
 // TickMsg is sent on each auto-refresh interval.
 type TickMsg time.Time
+
+// SpinnerTickMsg is sent for spinner animation during loading.
+type SpinnerTickMsg time.Time
 
 // keyMap defines keyboard shortcuts.
 type keyMap struct {
@@ -207,9 +213,9 @@ func NewModelWithInterval(result *api.ScanResult, scanFunc ScanFunc, interval ti
 
 // Init initializes the model.
 func (m Model) Init() tea.Cmd {
-	// If we're in loading state (async mode), trigger the initial scan
+	// If we're in loading state (async mode), trigger the initial scan and spinner
 	if m.refreshing && m.scanFunc != nil {
-		return m.doRefresh()
+		return tea.Batch(m.doRefresh(), spinnerTickCmd())
 	}
 	return nil
 }
@@ -285,6 +291,13 @@ func (m *Model) doRefresh() tea.Cmd {
 func (m *Model) tickCmd() tea.Cmd {
 	return tea.Tick(m.refreshInterval, func(t time.Time) tea.Msg {
 		return TickMsg(t)
+	})
+}
+
+// spinnerTickCmd returns a command that sends a SpinnerTickMsg for animation.
+func spinnerTickCmd() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return SpinnerTickMsg(t)
 	})
 }
 

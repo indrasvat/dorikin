@@ -50,44 +50,51 @@ func (m Model) View() string {
 
 // renderLoading renders a loading screen while initial scan is running.
 func (m Model) renderLoading() string {
-	// Build a loading screen consistent with dorikin AE86 theme
-	title := m.styles.Title.Render(" 🏎️  dorikin ")
+	// ASCII art banner in Tsuchiya Jade (TokyoNeon)
+	banner := m.styles.InSync.Render(`
+  ██████╗  ██████╗ ██████╗ ██╗██╗  ██╗██╗███╗   ██╗
+  ██╔══██╗██╔═══██╗██╔══██╗██║██║ ██╔╝██║████╗  ██║
+  ██║  ██║██║   ██║██████╔╝██║█████╔╝ ██║██╔██╗ ██║
+  ██║  ██║██║   ██║██╔══██╗██║██╔═██╗ ██║██║╚██╗██║
+  ██████╔╝╚██████╔╝██║  ██║██║██║  ██╗██║██║ ╚████║
+  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝`)
 
-	// Cluster context indicator
-	var clusterInfo string
+	// Subtitle with cluster context
+	var subtitle string
 	if m.kubeContext != "" {
-		clusterInfo = m.styles.ClusterContext.Render(" ☸ " + m.kubeContext + " ")
+		subtitle = m.styles.Subtle.Render("  🏎️  AE86 TEST TRACK") +
+			m.styles.ClusterContext.Render(" ☸ "+m.kubeContext+" ")
+	} else {
+		subtitle = m.styles.Subtle.Render("  🏎️  Kubernetes Configuration Drift Detector")
 	}
 
-	// Header line
-	header := m.styles.Header.Width(m.width - 4).Render(
-		lipgloss.JoinHorizontal(
-			lipgloss.Center,
-			title,
-			clusterInfo,
-		),
+	// Animated spinner frames (braille dots pattern)
+	spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	spinner := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
+
+	// Loading indicator with animated spinner
+	loadingText := m.styles.Drifted.Render("  " + spinner + " Scanning cluster for drift...")
+	hint := m.styles.Subtle.Render("  Fetching resources from Kubernetes API")
+
+	// Build content box
+	contentBox := lipgloss.JoinVertical(
+		lipgloss.Left,
+		banner,
+		"",
+		subtitle,
+		"",
+		"",
+		loadingText,
+		hint,
 	)
 
-	// Racing-themed loading message
-	// Using DriftYellow (activity indicator) for spinner
-	loadingBox := lipgloss.NewStyle().
-		Padding(2, 4).
-		Render(
-			lipgloss.JoinVertical(
-				lipgloss.Center,
-				m.styles.Drifted.Render("⟳ Scanning cluster..."),
-				"",
-				m.styles.Subtle.Render("Fetching resources from Kubernetes API"),
-			),
-		)
-
-	// Center the loading box
-	centeredLoading := lipgloss.Place(
+	// Center the content
+	centeredContent := lipgloss.Place(
 		m.width-4,
-		m.height-8,
+		m.height-4,
 		lipgloss.Center,
 		lipgloss.Center,
-		loadingBox,
+		contentBox,
 	)
 
 	// Footer with minimal hints
@@ -98,8 +105,7 @@ func (m Model) renderLoading() string {
 	return m.styles.Container.Render(
 		lipgloss.JoinVertical(
 			lipgloss.Left,
-			header,
-			centeredLoading,
+			centeredContent,
 			footer,
 		),
 	)
