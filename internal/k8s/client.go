@@ -173,18 +173,23 @@ func (c *Client) CurrentContext() string {
 
 // ListResources lists all resources of a given GVK in the specified namespaces.
 // If namespaces is empty, lists resources in all namespaces.
+// For cluster-scoped resources, the namespace filter is ignored (lists once without namespace).
 // When listing by namespace, errors for individual namespaces are logged but skipped
 // (e.g., if a namespace does not exist or access is denied).
 func (c *Client) ListResources(ctx context.Context, gvk schema.GroupVersionKind, namespaces []string) ([]*unstructured.Unstructured, error) {
-	gvr, err := c.gvkToGVR(gvk)
+	mapping, err := c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, fmt.Errorf("mapping GVK to GVR: %w", err)
 	}
+	gvr := mapping.Resource
 
 	var allResources []*unstructured.Unstructured
 
-	// If no namespaces specified, list across all namespaces
-	if len(namespaces) == 0 {
+	// Check if resource is cluster-scoped (not namespaced)
+	isClusterScoped := mapping.Scope.Name() == meta.RESTScopeNameRoot
+
+	// If no namespaces specified OR resource is cluster-scoped, list without namespace filter
+	if len(namespaces) == 0 || isClusterScoped {
 		result, err := c.dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("listing resources: %w", err)
@@ -195,7 +200,7 @@ func (c *Client) ListResources(ctx context.Context, gvk schema.GroupVersionKind,
 		return allResources, nil
 	}
 
-	// List resources in each namespace
+	// List namespaced resources in each namespace
 	for _, ns := range namespaces {
 		result, err := c.dynamic.Resource(gvr).Namespace(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
