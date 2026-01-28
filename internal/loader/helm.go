@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
+	"github.com/indrasvat/dorikin/internal/logcapture"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
 
@@ -159,8 +160,11 @@ func (h *HelmLoader) loadChart(ctx context.Context, helmBin, chartPath string) (
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		if timeoutCtx.Err() == context.DeadlineExceeded {
+		switch timeoutCtx.Err() {
+		case context.DeadlineExceeded:
 			return nil, fmt.Errorf("helm template timed out after %v", h.timeout)
+		case context.Canceled:
+			return nil, fmt.Errorf("helm template canceled")
 		}
 		return nil, fmt.Errorf("helm template failed: %w\n%s", err, stderr.String())
 	}
@@ -225,6 +229,8 @@ func (h *HelmLoader) parseYAML(ctx context.Context, r *bytes.Buffer, sourcePath 
 }
 
 // parseDocument parses a single YAML document.
+// Returns nil for empty documents, documents without a Kind, or parse errors.
+// Parse errors are logged so users know manifests are being skipped.
 func (h *HelmLoader) parseDocument(data []byte, sourcePath string) *api.Resource {
 	// Skip empty documents
 	if len(bytes.TrimSpace(data)) == 0 {
@@ -234,6 +240,7 @@ func (h *HelmLoader) parseDocument(data []byte, sourcePath string) *api.Resource
 	// Parse into unstructured
 	obj := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal(data, &obj.Object); err != nil {
+		logcapture.Warn("Failed to parse YAML document in %s: %v", sourcePath, err)
 		return nil
 	}
 

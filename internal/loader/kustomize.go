@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
+	"github.com/indrasvat/dorikin/internal/logcapture"
 	"github.com/indrasvat/dorikin/pkg/api"
 )
 
@@ -107,8 +108,11 @@ func (k *KustomizeLoader) loadKustomization(ctx context.Context, kustomizeBin, p
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		if timeoutCtx.Err() == context.DeadlineExceeded {
+		switch timeoutCtx.Err() {
+		case context.DeadlineExceeded:
 			return nil, fmt.Errorf("kustomize build timed out after %v", k.timeout)
+		case context.Canceled:
+			return nil, fmt.Errorf("kustomize build canceled")
 		}
 		return nil, fmt.Errorf("kustomize build failed: %w\n%s", err, stderr.String())
 	}
@@ -181,6 +185,8 @@ func (k *KustomizeLoader) parseYAML(ctx context.Context, r *bytes.Buffer, source
 }
 
 // parseDocument parses a single YAML document.
+// Returns nil for empty documents, documents without a Kind, or parse errors.
+// Parse errors are logged so users know manifests are being skipped.
 func (k *KustomizeLoader) parseDocument(data []byte, sourcePath string) *api.Resource {
 	// Skip empty documents
 	if len(bytes.TrimSpace(data)) == 0 {
@@ -190,6 +196,7 @@ func (k *KustomizeLoader) parseDocument(data []byte, sourcePath string) *api.Res
 	// Parse into unstructured
 	obj := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal(data, &obj.Object); err != nil {
+		logcapture.Warn("Failed to parse YAML document in %s: %v", sourcePath, err)
 		return nil
 	}
 
