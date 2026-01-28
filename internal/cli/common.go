@@ -57,18 +57,24 @@ type ScanContext struct {
 
 // BuildScanContext creates a ScanContext from flags and command args.
 func BuildScanContext(cmd *cobra.Command, args []string, f *ScanFlags) (*ScanContext, error) {
-	// Combine -f flags and positional args
-	paths := make([]string, 0, len(f.Manifests)+len(args))
-	paths = append(paths, f.Manifests...)
-	paths = append(paths, args...)
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("at least one manifest path required (use -f or positional args)")
-	}
-
 	// Load configuration from .dorikin.yaml (if present)
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Combine -f flags and positional args
+	paths := make([]string, 0, len(f.Manifests)+len(args))
+	paths = append(paths, f.Manifests...)
+	paths = append(paths, args...)
+
+	// Fall back to config paths if no CLI paths provided
+	if len(paths) == 0 {
+		paths = cfg.EffectivePaths()
+	}
+
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no manifest paths (use -f, positional args, or paths in .dorikin.yaml)")
 	}
 
 	// Determine effective ignore paths: CLI flag overrides config

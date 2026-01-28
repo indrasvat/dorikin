@@ -10,6 +10,10 @@ import (
 
 // Config represents the dorikin configuration.
 type Config struct {
+	// Paths lists default manifest paths to scan.
+	// Used when no paths are specified via CLI flags or arguments.
+	Paths []string `yaml:"paths"`
+
 	// Ignore configures field paths to skip during drift comparison.
 	Ignore IgnoreConfig `yaml:"ignore"`
 
@@ -156,4 +160,10 @@ func (c *Config) EffectiveHPAAware() string {
 		return "manifests"
 	}
 	return c.HPAAware
+}
+
+// EffectivePaths returns the configured manifest paths.
+// Returns nil if no paths are configured.
+func (c *Config) EffectivePaths() []string {
+	return c.Paths
 }
