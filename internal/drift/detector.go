@@ -71,9 +71,14 @@ func (d *Detector) Scan(ctx context.Context, opts api.ScanOptions) (*api.ScanRes
 		return nil, err
 	}
 
-	// Filter by namespace if specified
-	if opts.Namespace != "" {
-		resources = filterByNamespace(resources, opts.Namespace)
+	// Filter by namespace(s) if specified
+	// Support both old Namespace field (single) and new Namespaces field (multiple)
+	namespaces := opts.Namespaces
+	if len(namespaces) == 0 && opts.Namespace != "" { //nolint:staticcheck // backward compat
+		namespaces = []string{opts.Namespace} //nolint:staticcheck // backward compat
+	}
+	if len(namespaces) > 0 {
+		resources = filterByNamespaces(resources, namespaces)
 	}
 
 	// Filter by kind if specified
@@ -211,11 +216,26 @@ func (d *Detector) compareResource(resource api.Resource, fetchResult k8s.FetchR
 	return report
 }
 
-// filterByNamespace filters resources by namespace.
+// filterByNamespace filters resources by a single namespace.
+//
+// Deprecated: Use filterByNamespaces for multi-namespace support.
 func filterByNamespace(resources []api.Resource, namespace string) []api.Resource {
+	return filterByNamespaces(resources, []string{namespace})
+}
+
+// filterByNamespaces filters resources by namespace(s).
+// Cluster-scoped resources (empty namespace) are always included.
+func filterByNamespaces(resources []api.Resource, namespaces []string) []api.Resource {
+	if len(namespaces) == 0 {
+		return resources
+	}
+
+	nsSet := toSet(namespaces)
 	filtered := make([]api.Resource, 0, len(resources))
 	for _, res := range resources {
-		if res.Object.GetNamespace() == namespace || res.Object.GetNamespace() == "" {
+		ns := res.Object.GetNamespace()
+		// Include cluster-scoped resources (empty namespace) or resources in matching namespaces
+		if ns == "" || nsSet[ns] {
 			filtered = append(filtered, res)
 		}
 	}

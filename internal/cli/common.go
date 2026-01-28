@@ -15,7 +15,7 @@ import (
 // ScanFlags holds the common flags shared between scan and ui commands.
 type ScanFlags struct {
 	Manifests    []string
-	Namespace    string
+	Namespaces   []string
 	Kinds        []string
 	ExcludeKinds []string
 	Recursive    bool
@@ -35,7 +35,7 @@ type ScanFlags struct {
 // RegisterScanFlags registers the common scan flags on a cobra command.
 func RegisterScanFlags(cmd *cobra.Command, f *ScanFlags) {
 	cmd.Flags().StringArrayVarP(&f.Manifests, "file", "f", nil, "manifest file or directory (can be repeated)")
-	cmd.Flags().StringVarP(&f.Namespace, "namespace", "n", "", "filter by namespace")
+	cmd.Flags().StringSliceVarP(&f.Namespaces, "namespace", "n", nil, "filter by namespace(s) (repeatable or comma-separated)")
 	cmd.Flags().StringSliceVar(&f.Kinds, "kind", nil, "include only these Kinds (can be repeated)")
 	cmd.Flags().StringSliceVar(&f.ExcludeKinds, "exclude-kind", nil, "exclude these Kinds (can be repeated)")
 	cmd.Flags().BoolVarP(&f.Recursive, "recursive", "R", true, "recursively scan directories")
@@ -107,7 +107,12 @@ func BuildScanContext(cmd *cobra.Command, args []string, f *ScanFlags) (*ScanCon
 	}
 
 	// Select loader based on flags
-	ldr, err := BuildLoader(f.Helm, f.Kustomize, f.HelmRelease, f.Namespace, f.HelmValues, f.HelmSet)
+	// For Helm, use first namespace if specified (Helm templates typically target one namespace)
+	helmNamespace := ""
+	if len(f.Namespaces) > 0 {
+		helmNamespace = f.Namespaces[0]
+	}
+	ldr, err := BuildLoader(f.Helm, f.Kustomize, f.HelmRelease, helmNamespace, f.HelmValues, f.HelmSet)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +129,7 @@ func BuildScanContext(cmd *cobra.Command, args []string, f *ScanFlags) (*ScanCon
 	// Build scan options
 	opts := api.ScanOptions{
 		ManifestPaths: paths,
-		Namespace:     f.Namespace,
+		Namespaces:    f.Namespaces,
 		Kinds:         f.Kinds,
 		ExcludeKinds:  f.ExcludeKinds,
 		Recursive:     f.Recursive,

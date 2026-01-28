@@ -189,7 +189,11 @@ type ScanOptions struct {
 	// ManifestPaths are paths to manifest files or directories.
 	ManifestPaths []string
 	// Namespace filters resources by namespace (empty = all).
+	//
+	// Deprecated: Use Namespaces for multi-namespace support.
 	Namespace string
+	// Namespaces filters resources by namespace(s) (empty = all).
+	Namespaces []string
 	// Kinds filters to include only these resource kinds.
 	Kinds []string
 	// ExcludeKinds filters to exclude these resource kinds.

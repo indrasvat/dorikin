@@ -76,8 +76,8 @@ func WithTimeout(d time.Duration) HelmOption {
 // NewHelmLoader creates a new HelmLoader.
 func NewHelmLoader(opts ...HelmOption) *HelmLoader {
 	h := &HelmLoader{
-		releaseName: "release",          // default release name
-		timeout:     60 * time.Second,   // default timeout
+		releaseName: "release",        // default release name
+		timeout:     60 * time.Second, // default timeout
 	}
 	for _, opt := range opts {
 		opt(h)

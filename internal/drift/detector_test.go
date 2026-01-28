@@ -75,6 +75,70 @@ func TestFilterByNamespace_EmptyInput(t *testing.T) {
 	}
 }
 
+func TestFilterByNamespaces_Multiple(t *testing.T) {
+	resources := []api.Resource{
+		{Object: makeUnstructured("default", "Deployment", "nginx")},
+		{Object: makeUnstructured("prod", "Deployment", "web")},
+		{Object: makeUnstructured("staging", "Deployment", "app")},
+		{Object: makeUnstructured("", "ClusterRole", "admin")}, // cluster-scoped
+	}
+
+	tests := []struct {
+		name       string
+		namespaces []string
+		wantLen    int
+		wantNames  []string
+	}{
+		{
+			name:       "multiple namespaces",
+			namespaces: []string{"default", "prod"},
+			wantLen:    3, // 2 matching + 1 cluster-scoped
+			wantNames:  []string{"nginx", "web", "admin"},
+		},
+		{
+			name:       "single namespace",
+			namespaces: []string{"staging"},
+			wantLen:    2, // 1 matching + 1 cluster-scoped
+			wantNames:  []string{"app", "admin"},
+		},
+		{
+			name:       "empty namespaces returns all",
+			namespaces: nil,
+			wantLen:    4,
+			wantNames:  []string{"nginx", "web", "app", "admin"},
+		},
+		{
+			name:       "all namespaces",
+			namespaces: []string{"default", "prod", "staging"},
+			wantLen:    4,
+			wantNames:  []string{"nginx", "web", "app", "admin"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filterByNamespaces(resources, tt.namespaces)
+
+			if len(got) != tt.wantLen {
+				t.Errorf("len(filterByNamespaces()) = %d, want %d", len(got), tt.wantLen)
+			}
+
+			for _, wantName := range tt.wantNames {
+				found := false
+				for _, r := range got {
+					if r.Object.GetName() == wantName {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("filterByNamespaces() missing resource %q", wantName)
+				}
+			}
+		})
+	}
+}
+
 func TestExtractNamespaces(t *testing.T) {
 	tests := []struct {
 		name       string
