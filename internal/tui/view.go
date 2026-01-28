@@ -232,11 +232,13 @@ func (m Model) renderDetail() string {
 		return "No resource selected"
 	}
 
-	sections := []string{
+	// Preallocate with capacity 4: header, tabs, content, lap indicator
+	sections := make([]string, 0, 4)
+	sections = append(sections,
 		m.renderDetailHeader(report),
 		m.renderDetailTabs(),
 		m.renderDetailContent(report),
-	}
+	)
 
 	// Lap indicator (racing theme!)
 	lapIndicator := m.styles.Subtle.Render(fmt.Sprintf(
