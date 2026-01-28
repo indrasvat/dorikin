@@ -177,7 +177,10 @@ dorikin scan [flags] [paths...]
 | Flag | Short | Description |
 |------|-------|-------------|
 | `--file` | `-f` | Manifest file or directory (repeatable) |
-| `--namespace` | `-n` | Filter by namespace |
+| `--namespace` | `-n` | Filter by namespace(s) (repeatable or comma-separated) |
+| `--kind` | | Include only these resource kinds (repeatable) |
+| `--exclude-kind` | | Exclude these resource kinds (repeatable) |
+| `--include-extra` | | Detect cluster resources not in manifests |
 | `--output` | `-o` | Output format: `table`, `json`, `yaml`, `quiet` |
 | `--recursive` | `-R` | Recursively scan directories (default: true) |
 | `--ignore` | | Field paths to ignore during comparison |
@@ -197,7 +200,10 @@ dorikin ui [flags] [paths...]
 | Flag | Short | Description |
 |------|-------|-------------|
 | `--file` | `-f` | Manifest file or directory (repeatable) |
-| `--namespace` | `-n` | Filter by namespace |
+| `--namespace` | `-n` | Filter by namespace(s) (repeatable or comma-separated) |
+| `--kind` | | Include only these resource kinds (repeatable) |
+| `--exclude-kind` | | Exclude these resource kinds (repeatable) |
+| `--include-extra` | | Detect cluster resources not in manifests |
 | `--recursive` | `-R` | Recursively scan directories (default: true) |
 | `--refresh-interval` | | Auto-refresh interval in seconds (default: 5) |
 | `--ignore` | | Field paths to ignore during comparison |
@@ -207,6 +213,41 @@ dorikin ui [flags] [paths...]
 | `--helm-values` | | Helm values files (repeatable) |
 | `--helm-set` | | Helm --set values (repeatable) |
 | `--kustomize` | | Load manifests from Kustomize directory |
+
+### Configuration File
+
+Dorikin supports a `.dorikin.yaml` configuration file in the current directory for default settings:
+
+```yaml
+# .dorikin.yaml
+paths:
+  - ./manifests/
+  - ./k8s/
+
+ignore:
+  - .metadata.annotations.custom-annotation
+
+hpaAware: manifests  # manifests, cluster, or disabled
+```
+
+CLI flags override configuration file settings.
+
+### Resource Filtering Examples
+
+```bash
+# Scan only Deployments and Services
+dorikin scan --kind Deployment --kind Service ./manifests/
+
+# Exclude Secrets and ConfigMaps
+dorikin scan --exclude-kind Secret --exclude-kind ConfigMap ./manifests/
+
+# Scan multiple namespaces
+dorikin scan -n prod -n staging ./manifests/
+dorikin scan -n prod,staging ./manifests/  # comma-separated
+
+# Detect extra resources in cluster not defined in manifests
+dorikin scan --include-extra ./manifests/
+```
 
 ## TUI Controls
 
