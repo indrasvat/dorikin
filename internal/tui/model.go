@@ -48,6 +48,7 @@ type Model struct {
 	refreshing      bool
 	autoRefresh     bool
 	refreshInterval time.Duration
+	scanError       error // Last scan error (if any)
 
 	// UI state
 	cursor   int
@@ -343,5 +344,6 @@ func NewModelAsync(scanFunc ScanFunc, interval time.Duration, capture *logcaptur
 		kubeContext:     kubeContext,
 	}
 
+	m.applyFilter()
 	return m
 }

@@ -26,6 +26,11 @@ func (m Model) View() string {
 		return m.renderLoading()
 	}
 
+	// Show error state if initial scan failed
+	if m.scanError != nil && len(m.reports) == 0 {
+		return m.renderError()
+	}
+
 	var content string
 	switch m.viewMode {
 	case ViewHelp:
@@ -100,6 +105,63 @@ func (m Model) renderLoading() string {
 	// Footer with minimal hints
 	footer := m.styles.Footer.Width(m.width - 4).Render(
 		m.styles.HelpKey.Render("q") + m.styles.HelpDesc.Render(" quit"),
+	)
+
+	return m.styles.Container.Render(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			centeredContent,
+			footer,
+		),
+	)
+}
+
+// renderError renders an error screen when the scan fails.
+func (m Model) renderError() string {
+	// ASCII art banner in red
+	banner := m.styles.Error.Render(`
+  ██████╗  ██████╗ ██████╗ ██╗██╗  ██╗██╗███╗   ██╗
+  ██╔══██╗██╔═══██╗██╔══██╗██║██║ ██╔╝██║████╗  ██║
+  ██║  ██║██║   ██║██████╔╝██║█████╔╝ ██║██╔██╗ ██║
+  ██║  ██║██║   ██║██╔══██╗██║██╔═██╗ ██║██║╚██╗██║
+  ██████╔╝╚██████╔╝██║  ██║██║██║  ██╗██║██║ ╚████║
+  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝`)
+
+	// Error title
+	errorTitle := m.styles.Error.Render("  💥 SCAN FAILED")
+
+	// Error message
+	errorMsg := m.styles.Subtle.Render(fmt.Sprintf("  %v", m.scanError))
+
+	// Hint
+	hint := m.styles.Subtle.Render("  Press 'L' to view logs for more details, 'r' to retry, or 'q' to quit")
+
+	// Build content box
+	contentBox := lipgloss.JoinVertical(
+		lipgloss.Left,
+		banner,
+		"",
+		errorTitle,
+		"",
+		errorMsg,
+		"",
+		hint,
+	)
+
+	// Center the content
+	centeredContent := lipgloss.Place(
+		m.width-4,
+		m.height-4,
+		lipgloss.Center,
+		lipgloss.Center,
+		contentBox,
+	)
+
+	// Footer with hints
+	footer := m.styles.Footer.Width(m.width - 4).Render(
+		m.styles.HelpKey.Render("L") + m.styles.HelpDesc.Render(" logs") + "  " +
+			m.styles.HelpKey.Render("r") + m.styles.HelpDesc.Render(" retry") + "  " +
+			m.styles.HelpKey.Render("q") + m.styles.HelpDesc.Render(" quit"),
 	)
 
 	return m.styles.Container.Render(

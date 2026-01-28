@@ -135,7 +135,9 @@ func (m Model) handleRefreshMsg(msg RefreshMsg) (tea.Model, tea.Cmd) {
 	m.refreshing = false
 	if msg.Err != nil {
 		logcapture.Error("Refresh failed: %v", msg.Err)
+		m.scanError = msg.Err // Store error for display in UI
 	} else if msg.Result != nil {
+		m.scanError = nil // Clear any previous error on success
 		m.updateFromResult(msg.Result)
 		m.logScanSummary(msg.Result.Summary)
 	}
