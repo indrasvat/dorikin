@@ -76,6 +76,11 @@ func (d *Detector) Scan(ctx context.Context, opts api.ScanOptions) (*api.ScanRes
 		resources = filterByNamespace(resources, opts.Namespace)
 	}
 
+	// Filter by kind if specified
+	if len(opts.Kinds) > 0 || len(opts.ExcludeKinds) > 0 {
+		resources = filterByKind(resources, opts.Kinds, opts.ExcludeKinds)
+	}
+
 	// Build HPA target index for replica-aware comparison
 	var hpaIndex *HPATargetIndex
 	if opts.HPAAware != api.HPAAwareModeDisabled {
@@ -215,6 +220,44 @@ func filterByNamespace(resources []api.Resource, namespace string) []api.Resourc
 		}
 	}
 	return filtered
+}
+
+// filterByKind filters resources by kind.
+// If include is non-empty, only resources with kinds in include are returned.
+// If exclude is non-empty, resources with kinds in exclude are filtered out.
+func filterByKind(resources []api.Resource, include, exclude []string) []api.Resource {
+	includeSet := toSet(include)
+	excludeSet := toSet(exclude)
+
+	filtered := make([]api.Resource, 0, len(resources))
+	for _, res := range resources {
+		kind := res.Object.GetKind()
+
+		// If include filter is specified, kind must be in the include set
+		if len(includeSet) > 0 && !includeSet[kind] {
+			continue
+		}
+
+		// If kind is in exclude set, skip it
+		if excludeSet[kind] {
+			continue
+		}
+
+		filtered = append(filtered, res)
+	}
+	return filtered
+}
+
+// toSet converts a string slice to a set (map[string]bool).
+func toSet(items []string) map[string]bool {
+	if len(items) == 0 {
+		return nil
+	}
+	set := make(map[string]bool, len(items))
+	for _, item := range items {
+		set[item] = true
+	}
+	return set
 }
 
 // extractNamespaces returns unique namespaces from resources.

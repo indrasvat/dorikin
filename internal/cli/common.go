@@ -14,11 +14,13 @@ import (
 
 // ScanFlags holds the common flags shared between scan and ui commands.
 type ScanFlags struct {
-	Manifests []string
-	Namespace string
-	Recursive bool
-	Ignore    []string
-	HPAAware  string
+	Manifests    []string
+	Namespace    string
+	Kinds        []string
+	ExcludeKinds []string
+	Recursive    bool
+	Ignore       []string
+	HPAAware     string
 
 	// Helm flags
 	Helm        bool
@@ -34,6 +36,8 @@ type ScanFlags struct {
 func RegisterScanFlags(cmd *cobra.Command, f *ScanFlags) {
 	cmd.Flags().StringArrayVarP(&f.Manifests, "file", "f", nil, "manifest file or directory (can be repeated)")
 	cmd.Flags().StringVarP(&f.Namespace, "namespace", "n", "", "filter by namespace")
+	cmd.Flags().StringSliceVar(&f.Kinds, "kind", nil, "include only these Kinds (can be repeated)")
+	cmd.Flags().StringSliceVar(&f.ExcludeKinds, "exclude-kind", nil, "exclude these Kinds (can be repeated)")
 	cmd.Flags().BoolVarP(&f.Recursive, "recursive", "R", true, "recursively scan directories")
 	cmd.Flags().StringSliceVar(&f.Ignore, "ignore", nil, "field paths to ignore (overrides config file)")
 	cmd.Flags().StringVar(&f.HPAAware, "hpa-aware", "", "HPA awareness mode: manifests (default), cluster, disabled")
@@ -121,6 +125,8 @@ func BuildScanContext(cmd *cobra.Command, args []string, f *ScanFlags) (*ScanCon
 	opts := api.ScanOptions{
 		ManifestPaths: paths,
 		Namespace:     f.Namespace,
+		Kinds:         f.Kinds,
+		ExcludeKinds:  f.ExcludeKinds,
 		Recursive:     f.Recursive,
 		HPAAware:      hpaMode,
 	}

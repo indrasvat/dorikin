@@ -190,6 +190,10 @@ type ScanOptions struct {
 	ManifestPaths []string
 	// Namespace filters resources by namespace (empty = all).
 	Namespace string
+	// Kinds filters to include only these resource kinds.
+	Kinds []string
+	// ExcludeKinds filters to exclude these resource kinds.
+	ExcludeKinds []string
 	// KubeContext is the kubectl context to use.
 	KubeContext string
 	// KubeConfig is the path to kubeconfig file.
