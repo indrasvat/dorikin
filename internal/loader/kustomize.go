@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -18,7 +19,8 @@ import (
 
 // KustomizeLoader loads manifests by running kustomize build.
 type KustomizeLoader struct {
-	kustomizePath string // path to kustomize binary (auto-detected if empty)
+	kustomizePath string        // path to kustomize binary (auto-detected if empty)
+	timeout       time.Duration // timeout for kustomize commands (default: 60s)
 }
 
 // KustomizeOption is a functional option for configuring KustomizeLoader.
@@ -31,9 +33,19 @@ func WithKustomizePath(path string) KustomizeOption {
 	}
 }
 
+// WithKustomizeTimeout sets the timeout for kustomize commands.
+// Default is 60 seconds.
+func WithKustomizeTimeout(d time.Duration) KustomizeOption {
+	return func(k *KustomizeLoader) {
+		k.timeout = d
+	}
+}
+
 // NewKustomizeLoader creates a new KustomizeLoader.
 func NewKustomizeLoader(opts ...KustomizeOption) *KustomizeLoader {
-	k := &KustomizeLoader{}
+	k := &KustomizeLoader{
+		timeout: 60 * time.Second, // default timeout
+	}
 	for _, opt := range opts {
 		opt(k)
 	}
@@ -84,13 +96,20 @@ func (k *KustomizeLoader) loadKustomization(ctx context.Context, kustomizeBin, p
 		return nil, err
 	}
 
+	// Wrap context with timeout to prevent indefinite hangs
+	timeoutCtx, cancel := context.WithTimeout(ctx, k.timeout)
+	defer cancel()
+
 	// Run kustomize build
-	cmd := exec.CommandContext(ctx, kustomizeBin, "build", path)
+	cmd := exec.CommandContext(timeoutCtx, kustomizeBin, "build", path)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		if timeoutCtx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("kustomize build timed out after %v", k.timeout)
+		}
 		return nil, fmt.Errorf("kustomize build failed: %w\n%s", err, stderr.String())
 	}
 

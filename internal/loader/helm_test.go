@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"testing"
+	"time"
 )
 
 func helmAvailable() bool {
@@ -229,5 +230,19 @@ func TestHelmLoader_FindHelm_InPath(t *testing.T) {
 	}
 	if path == "" {
 		t.Error("findHelm() returned empty path")
+	}
+}
+
+func TestHelmLoader_WithTimeout(t *testing.T) {
+	l := NewHelmLoader(WithTimeout(30 * time.Second))
+	if l.timeout != 30*time.Second {
+		t.Errorf("timeout = %v, want %v", l.timeout, 30*time.Second)
+	}
+}
+
+func TestHelmLoader_DefaultTimeout(t *testing.T) {
+	l := NewHelmLoader()
+	if l.timeout != 60*time.Second {
+		t.Errorf("default timeout = %v, want %v", l.timeout, 60*time.Second)
 	}
 }
