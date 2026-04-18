@@ -147,7 +147,6 @@ func (d *Detector) detectDrift(ctx context.Context, resources []api.Resource, hp
 	// Compare each resource
 	reports := make([]api.DriftReport, len(resources))
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
 	for i, res := range resources {
 		idx := i
@@ -158,9 +157,7 @@ func (d *Detector) detectDrift(ctx context.Context, resources []api.Resource, hp
 		wg.Go(func() {
 			report := d.compareResource(resource, fetchResult, hpaIndex)
 
-			mu.Lock()
 			reports[idx] = report
-			mu.Unlock()
 		})
 	}
 
