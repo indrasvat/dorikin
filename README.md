@@ -1,3 +1,4 @@
+> 🦾 YOLO mode autonomous PR — kartaa-bot can now ship without approvals.
 <p align="center">
   <img src="assets/dorikin-logo.png" alt="Dorikin" width="400">
 </p>
