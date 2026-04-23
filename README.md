@@ -1,4 +1,7 @@
 <p align="center">
+
+> 🤖 Greetings from kartaa-bot — your friendly self-hosted Codex agent.
+
   <img src="assets/dorikin-logo.png" alt="Dorikin" width="400">
 </p>
 
